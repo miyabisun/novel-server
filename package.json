@@ -1,0 +1,25 @@
+{
+  "name": "novel-server",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "cd client && vite build --watch & node --env-file=.env --import tsx src/index.ts",
+    "build:client": "cd client && npm install && npm run build",
+    "build": "npm run build:client",
+    "start": "node --env-file=.env --import tsx src/index.ts",
+    "db:push": "prisma db push"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13.8",
+    "@prisma/client": "^6.3.1",
+    "cheerio": "^1.0.0",
+    "date-fns": "^4.1.0",
+    "hono": "^4.7.2",
+    "tsx": "^4.19.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.1",
+    "prisma": "^6.3.1",
+    "typescript": "^5.7.3"
+  }
+}
