@@ -15,6 +15,7 @@
 		try {
 			const data = await fetcher(`${config.path.api}/novel/${type}/${id}/pages/${num}`);
 			html = data.html || '';
+			updateProgress(type, id, num);
 		} catch (e) {
 			error = e.message;
 			html = '';
@@ -39,6 +40,15 @@
 			e.preventDefault();
 			navigate('/');
 		}
+	}
+
+	function updateProgress(type, id, num) {
+		fetch(`${config.path.api}/favorites/${type}/${id}/progress`, {
+			method: 'PATCH',
+			headers: { 'Content-Type': 'application/json' },
+			credentials: 'include',
+			body: JSON.stringify({ read: Number(num) }),
+		}).catch(() => {});
 	}
 
 	$effect(() => {

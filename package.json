@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "cd client && vite build --watch & node --env-file=.env --import tsx src/index.ts",
+    "dev": "cd client && npx vite build --watch & node --env-file=.env --import tsx src/index.ts",
     "build:client": "cd client && npm install && npm run build",
     "build": "npm run build:client",
     "start": "node --env-file=.env --import tsx src/index.ts",
