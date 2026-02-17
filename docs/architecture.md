@@ -60,7 +60,7 @@ novel-server/
 
 `src/modules/` 内の各モジュールは以下のインターフェースを実装しています:
 
-- `fetchRankingList()` — ランキングデータを取得してジャンル別にグループ化
+- `fetchRankingList(limit?, period?)` — ランキングデータを取得してジャンル別にグループ化（period: `daily` / `weekly` / `monthly` / `quarter` / `yearly`）
 - `fetchPage(id, num)` — 小説の本文 HTML を取得
 
 ### キャッシュ戦略
@@ -107,9 +107,9 @@ SQLite + Prisma を使用。テーブルは 2 つ:
 
 | Index | パス | ページ |
 |-------|------|--------|
-| 0 | `/` | Ranking |
+| 0 | `/` | Favorites |
 | 1 | `/login` | Login |
-| 2 | `/favorites` | Favorites |
+| 2 | `/ranking/:type` | Ranking |
 | 3 | `/novel/:type/:id/:num` | Reader |
 
 ### 状態管理

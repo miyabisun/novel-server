@@ -11,17 +11,22 @@ function toDatum(datum: Record<string, unknown>) {
 const narou = {
   fetchApi,
 
-  fetchRanking(genre: string | number, limit: number) {
-    return fetchApi({ of: 't-w-n-ga', lim: limit, order: 'dailypoint', genre })
+  fetchRanking(genre: string | number, limit: number, order: string = 'dailypoint') {
+    return fetchApi({ of: 't-w-n-ga', lim: limit, order, genre })
   },
 
-  async fetchRankingList(limit: number = 100) {
+  async fetchRankingList(limit: number = 100, period: string = 'daily') {
     const genres = [
       ['異世界 [恋愛]', 101], ['現実世界 [恋愛]', 102],
       ['ハイファンタジー', 201], ['ローファンタジー', 202],
       ['アクション', 306],
     ] as const
-    const results = await Promise.all(genres.map(([, g]) => narou.fetchRanking(g, limit)))
+    const orderMap: Record<string, string> = {
+      daily: 'dailypoint', weekly: 'weeklypoint', monthly: 'monthlypoint',
+      quarter: 'quarterpoint', yearly: 'yearlypoint',
+    }
+    const order = orderMap[period] ?? 'dailypoint'
+    const results = await Promise.all(genres.map(([, g]) => narou.fetchRanking(g, limit, order)))
     return Object.fromEntries(genres.map(([name], i) => [name, results[i]]))
   },
 

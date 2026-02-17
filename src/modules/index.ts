@@ -3,7 +3,7 @@ import narou from './narou.js'
 import nocturne from './nocturne.js'
 
 interface NovelModule {
-  fetchRankingList(limit?: number): Promise<Record<string, Record<string, unknown>[]>>
+  fetchRankingList(limit?: number, period?: string): Promise<Record<string, Record<string, unknown>[]>>
   fetchPage(id: string, pageId: string | number): Promise<string | null>
 }
 

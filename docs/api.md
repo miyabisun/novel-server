@@ -71,9 +71,12 @@ Cookie を削除してログアウトします。
 
 **パラメータ:**
 
-| 名前 | 値 | 説明 |
-|------|-----|------|
-| `type` | `narou` / `kakuyomu` / `nocturne` | 対象サイト |
+| 名前 | 位置 | 値 | 説明 |
+|------|------|-----|------|
+| `type` | path | `narou` / `kakuyomu` / `nocturne` | 対象サイト |
+| `period` | query | `daily` / `weekly` / `monthly` / `quarter` / `yearly` | 期間（デフォルト: `daily`） |
+
+> **注意:** `kakuyomu` は `quarter` に非対応です（400 エラー）。
 
 **レスポンス (200):**
 
@@ -95,13 +98,15 @@ Cookie を削除してログアウトします。
 
 ```json
 { "error": "Invalid type" }
+{ "error": "Invalid period" }
+{ "error": "kakuyomu does not support quarter ranking" }
 ```
 
 ---
 
 ### PATCH `/api/novel/:type/ranking`
 
-キャッシュを無視してランキングを再取得します。レスポンス形式は GET と同一です。
+キャッシュを無視してランキングを再取得します。パラメータ・レスポンス形式は GET と同一です。
 
 ---
 

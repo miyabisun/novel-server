@@ -37,8 +37,6 @@
 </script>
 
 <div class="favorites">
-	<h1>お気に入り</h1>
-
 	{#if loading}
 		<p class="status">読み込み中...</p>
 	{:else if error}
@@ -76,10 +74,6 @@
 <style lang="sass">
 .favorites
 	padding: 0 15px
-
-	h1
-		font-size: 1.2rem
-		margin: 0 0 16px 0
 
 .col-type
 	width: 80px

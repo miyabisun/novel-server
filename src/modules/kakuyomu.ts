@@ -61,8 +61,9 @@ const kakuyomu = {
     return result
   },
 
-  async fetchRankingList() {
-    return { '総合': await kakuyomu.fetchRanking('all', 'weekly') }
+  async fetchRankingList(_limit?: number, period: string = 'daily') {
+    if (period === 'quarter') throw new Error('kakuyomu does not support quarter ranking')
+    return { '総合': await kakuyomu.fetchRanking('all', period) }
   },
 
   async fetchDatum(id: string) {

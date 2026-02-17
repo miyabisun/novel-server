@@ -12,7 +12,7 @@ let _params = $state({});
 export const routes = [
 	{ pattern: /^\/$/, params: [] },
 	{ pattern: /^\/login$/, params: [] },
-	{ pattern: /^\/favorites$/, params: [] },
+	{ pattern: /^\/ranking\/([^/]+)$/, params: ['type'] },
 	{ pattern: /^\/novel\/([^/]+)\/([^/]+)\/(\d+)$/, params: ['type', 'id', 'num'] },
 ];
 

@@ -3,20 +3,30 @@
 	import fetcher from '$lib/fetcher.js';
 	import { navigate } from '$lib/router.svelte.js';
 
-	const types = ['narou', 'kakuyomu', 'nocturne'];
-	let activeType = $state('narou');
+	let { type } = $props();
+
+	const allPeriods = [
+		{ key: 'daily', label: '日間' },
+		{ key: 'weekly', label: '週間' },
+		{ key: 'monthly', label: '月間' },
+		{ key: 'quarter', label: '四半期', exclude: ['kakuyomu'] },
+		{ key: 'yearly', label: '年間' },
+	];
+	let periods = $derived(allPeriods.filter((p) => !p.exclude?.includes(type)));
+	let activePeriod = $state('daily');
 	let ranking = $state(null);
 	let activeGenre = $state(null);
 	let loading = $state(false);
 	let error = $state(null);
+	let genres = $derived(ranking ? Object.keys(ranking) : []);
 
-	async function loadRanking(type) {
+	async function loadRanking(t, period) {
 		loading = true;
 		error = null;
 		try {
-			ranking = await fetcher(`${config.path.api}/novel/${type}/ranking`);
-			const genres = Object.keys(ranking);
-			activeGenre = genres.length > 1 ? genres[0] : null;
+			ranking = await fetcher(`${config.path.api}/novel/${t}/ranking?period=${period}`);
+			const keys = Object.keys(ranking);
+			activeGenre = keys.length > 1 ? keys[0] : null;
 		} catch (e) {
 			error = e.message;
 			ranking = null;
@@ -25,12 +35,12 @@
 		}
 	}
 
-	function selectType(type) {
-		activeType = type;
-		loadRanking(type);
+	function selectPeriod(period) {
+		activePeriod = period;
+		loadRanking(type, period);
 	}
 
-	function goToReader(type, id, num = 1) {
+	function goToReader(id, num = 1) {
 		navigate(`/novel/${type}/${id}/${num}`);
 	}
 
@@ -38,7 +48,7 @@
 		e.stopPropagation();
 		const btn = e.currentTarget;
 		try {
-			await fetcher(`${config.path.api}/favorites/${activeType}/${novel.id}`, {
+			await fetcher(`${config.path.api}/favorites/${type}/${novel.id}`, {
 				method: 'PUT',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ title: novel.title, page: novel.page }),
@@ -49,27 +59,14 @@
 		}
 	}
 
-	// Initial load only
-	loadRanking('narou');
+	$effect(() => {
+		activePeriod = 'daily';
+		loadRanking(type, 'daily');
+	});
 </script>
 
 <div class="ranking">
-	<div class="tabs">
-		{#each types as type}
-			<button
-				class="tab"
-				class:active={activeType === type}
-				onclick={() => selectType(type)}
-			>{type}</button>
-		{/each}
-	</div>
-
-	{#if loading}
-		<p class="status">読み込み中...</p>
-	{:else if error}
-		<p class="status error">{error}</p>
-	{:else if ranking}
-		{@const genres = Object.keys(ranking)}
+	<div class="toolbar">
 		{#if genres.length > 1}
 			<div class="genre-tabs">
 				{#each genres as genre}
@@ -81,26 +78,42 @@
 				{/each}
 			</div>
 		{/if}
+		<div class="period-tabs">
+			{#each periods as p}
+				<button
+					class="period-tab"
+					class:active={activePeriod === p.key}
+					onclick={() => selectPeriod(p.key)}
+				>{p.label}</button>
+			{/each}
+		</div>
+	</div>
+
+	{#if loading}
+		<p class="status">読み込み中...</p>
+	{:else if error}
+		<p class="status error">{error}</p>
+	{:else if ranking}
 		{@const visibleGenres = activeGenre ? [[activeGenre, ranking[activeGenre] ?? []]] : Object.entries(ranking)}
 		{#each visibleGenres as [genre, novels]}
 			<table>
 				<thead>
 					<tr>
-						<th class="col-fav"></th>
 						<th class="col-rank">#</th>
 						<th class="col-title">タイトル</th>
 						<th class="col-page">話数</th>
+						<th class="col-fav"></th>
 					</tr>
 				</thead>
 				<tbody>
 					{#each novels as novel, i}
-						<tr onclick={() => goToReader(activeType, novel.id)} class="clickable">
-							<td class="col-fav">
-								<button class="fav-btn" onclick={(e) => addFavorite(e, novel)}>☆</button>
-							</td>
+						<tr onclick={() => goToReader(novel.id)} class="clickable">
 							<td class="col-rank">{i + 1}</td>
 							<td class="col-title">{novel.title}</td>
 							<td class="col-page">{novel.page}</td>
+							<td class="col-fav">
+								<button class="fav-btn" onclick={(e) => addFavorite(e, novel)}>☆</button>
+							</td>
 						</tr>
 					{/each}
 				</tbody>
@@ -113,26 +126,35 @@
 .ranking
 	padding: 0 15px
 
-.tabs
+.toolbar
+	display: flex
+	justify-content: space-between
+	align-items: center
+	margin-bottom: 12px
+	flex-wrap: wrap
+	gap: 8px
+
+.period-tabs
 	display: flex
 	gap: 4px
-	margin-bottom: 16px
+	margin-left: auto
 
-.tab
-	padding: 6px 16px
-	border: 1px solid #555
+.period-tab
+	padding: 4px 10px
+	border: 1px solid #444
 	background: transparent
-	color: rgba(255, 255, 255, 0.7)
+	color: rgba(255, 255, 255, 0.6)
 	cursor: pointer
-	border-radius: 4px
+	border-radius: 3px
+	font-size: 0.8rem
 
 	&:hover
-		background: rgba(255, 255, 255, 0.1)
+		background: rgba(255, 255, 255, 0.08)
 
 	&.active
-		background: rgba(255, 255, 255, 0.2)
+		background: rgba(255, 255, 255, 0.15)
 		color: white
-		border-color: rgba(128, 192, 255, 0.6)
+		border-color: rgba(128, 192, 255, 0.5)
 
 .status
 	text-align: center
@@ -145,7 +167,6 @@
 .genre-tabs
 	display: flex
 	gap: 4px
-	margin-bottom: 12px
 	flex-wrap: wrap
 
 .genre-tab
@@ -193,4 +214,69 @@
 
 .clickable
 	cursor: pointer
+
+// Desktop: sticky toolbar + thead
+@media (min-width: 800px)
+	.toolbar
+		position: sticky
+		top: 42px
+		background: #222
+		z-index: 50
+		padding-bottom: 12px
+		margin-bottom: 0
+
+	table :global(thead th)
+		position: sticky
+		top: 76px
+		background: #222
+		z-index: 40
+		box-shadow: 0 -8px 0 #222
+
+// Mobile: card layout
+@media (max-width: 799px)
+	table
+		display: block
+
+	table :global(thead)
+		display: none
+
+	table :global(tbody)
+		display: flex
+		flex-direction: column
+		gap: 8px
+
+	table :global(tr)
+		display: flex
+		flex-wrap: wrap
+		align-items: center
+		gap: 4px 8px
+		padding: 8px
+		border: 1px solid #444
+		border-radius: 6px
+
+	table :global(td)
+		padding: 0
+
+	table :global(.col-fav)
+		display: none
+
+	table :global(.col-rank)
+		width: auto
+		font-weight: bold
+		&::after
+			content: "位"
+
+	table :global(.col-title)
+		width: 100%
+		order: 2
+
+	table :global(.col-page)
+		width: auto
+		margin-left: auto
+		font-size: 0.8rem
+		color: rgba(255, 255, 255, 0.5)
+		&::before
+			content: "全"
+		&::after
+			content: "話"
 </style>

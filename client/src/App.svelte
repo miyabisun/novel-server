@@ -48,9 +48,9 @@
 {:else}
 	<Header />
 	{#if router.index === 0}
-		<Ranking />
-	{:else if router.index === 2}
 		<Favorites />
+	{:else if router.index === 2}
+		<Ranking type={router.params.type} />
 	{:else if router.index === 3}
 		<Reader params={router.params} />
 	{/if}

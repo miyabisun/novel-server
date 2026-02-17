@@ -11,13 +11,18 @@ function toDatum(datum: Record<string, unknown>) {
 const nocturne = {
   fetchApi,
 
-  fetchRanking(genre: string | number, limit: number) {
-    return fetchApi({ of: ['t', 'w', 'n', 'ga'], lim: limit, order: 'dailypoint', nocgenre: genre })
+  fetchRanking(genre: string | number, limit: number, order: string = 'dailypoint') {
+    return fetchApi({ of: ['t', 'w', 'n', 'ga'], lim: limit, order, nocgenre: genre })
   },
 
-  async fetchRankingList(limit: number = 100) {
+  async fetchRankingList(limit: number = 100, period: string = 'daily') {
+    const orderMap: Record<string, string> = {
+      daily: 'dailypoint', weekly: 'weeklypoint', monthly: 'monthlypoint',
+      quarter: 'quarterpoint', yearly: 'yearlypoint',
+    }
+    const order = orderMap[period] ?? 'dailypoint'
     return {
-      'ノクターン': await nocturne.fetchRanking(1, limit),
+      'ノクターン': await nocturne.fetchRanking(1, limit, order),
     }
   },
 
