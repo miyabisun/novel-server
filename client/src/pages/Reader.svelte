@@ -7,6 +7,7 @@
 	let html = $state('');
 	let loading = $state(false);
 	let error = $state(null);
+	let title = $state('');
 	let currentNum = $derived(Number(params.num));
 
 	async function loadPage(type, id, num) {
@@ -51,6 +52,17 @@
 		}).catch(() => {});
 	}
 
+	async function loadDetail(type, id) {
+		try {
+			const data = await fetcher(`${config.path.api}/novel/${type}/${id}/detail`);
+			title = data.title || '';
+		} catch (e) { console.warn('loadDetail failed:', e) }
+	}
+
+	$effect(() => {
+		loadDetail(params.type, params.id);
+	});
+
 	$effect(() => {
 		loadPage(params.type, params.id, params.num);
 		window.scrollTo(0, 0);
@@ -65,7 +77,7 @@
 <div class="reader">
 	<nav class="nav">
 		<button onclick={() => navigate('/')}>← ランキングへ</button>
-		<span class="page-info">{params.type} / {params.id} / {currentNum}話</span>
+		<span class="page-info">{title || params.id} / {currentNum}話</span>
 		<div class="page-controls">
 			<button onclick={() => goTo(currentNum - 1)} disabled={currentNum <= 1}>← 前</button>
 			<button onclick={() => goTo(currentNum + 1)}>次 →</button>

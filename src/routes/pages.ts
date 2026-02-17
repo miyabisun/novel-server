@@ -11,7 +11,7 @@ const PAGE_TTL = 60 * 60 * 24 // 24 hours
 // cheerio.load() が生成する構造タグ + コンテンツ許可タグ
 const ALLOWED_TAGS = new Set([
   'html', 'head', 'body',
-  'p', 'br', 'div', 'span',
+  'p', 'br', 'hr', 'div', 'span',
   'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
   'ruby', 'rt', 'rp', 'rb',
   'em', 'strong', 'b', 'i', 'u', 's', 'sub', 'sup',

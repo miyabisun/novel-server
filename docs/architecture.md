@@ -16,6 +16,7 @@ novel-server/
 │   │   └── nocturne.ts         # ノクターンスクレイピング
 │   └── routes/
 │       ├── auth.ts             # 認証 API
+│       ├── detail.ts           # 小説詳細 API
 │       ├── favorites.ts        # お気に入り CRUD
 │       ├── ranking.ts          # ランキング API
 │       └── pages.ts            # 小説本文 API
@@ -29,7 +30,8 @@ novel-server/
 │   │   │   ├── fetcher.js      # fetch ラッパー（401 ハンドリング）
 │   │   │   ├── router.svelte.js # SPA ルーター
 │   │   │   └── components/
-│   │   │       └── Header.svelte
+│   │   │       ├── Header.svelte
+│   │   │       └── NovelDetailModal.svelte
 │   │   └── pages/
 │   │       ├── Ranking.svelte  # ランキング一覧
 │   │       ├── Reader.svelte   # 小説リーダー
@@ -61,6 +63,7 @@ novel-server/
 `src/modules/` 内の各モジュールは以下のインターフェースを実装しています:
 
 - `fetchRankingList(limit?, period?)` — ランキングデータを取得してジャンル別にグループ化（period: `daily` / `weekly` / `monthly` / `quarter` / `yearly`）
+- `fetchDetail(id)` — 小説のタイトルとあらすじを取得
 - `fetchPage(id, num)` — 小説の本文 HTML を取得
 
 ### キャッシュ戦略
@@ -70,6 +73,7 @@ novel-server/
 | 対象 | TTL | 説明 |
 |------|-----|------|
 | ランキング | 3 時間 | 各サイトのランキングは頻繁には更新されない |
+| 小説詳細 | 24 時間 | タイトル・あらすじは基本的に変わらない |
 | ページ本文 | 24 時間 | 小説の本文は基本的に変わらない |
 
 キャッシュの強制更新は各エンドポイントの `PATCH` メソッドで行えます。

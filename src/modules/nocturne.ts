@@ -12,7 +12,7 @@ const nocturne = {
   fetchApi,
 
   fetchRanking(genre: string | number, limit: number, order: string = 'dailypoint') {
-    return fetchApi({ of: ['t', 'w', 'n', 'ga'], lim: limit, order, nocgenre: genre })
+    return fetchApi({ of: ['t', 'w', 'n', 'ga', 'nt'], lim: limit, order, nocgenre: genre })
   },
 
   async fetchRankingList(limit: number = 100, period: string = 'daily') {
@@ -36,10 +36,18 @@ const nocturne = {
     return data.map(toDatum)
   },
 
+  async fetchDetail(id: string) {
+    const data = await fetchApi({ of: 't-s', ncode: id })
+    if (!data[0]) throw new Error('Novel not found')
+    return { title: data[0].title as string, synopsis: (data[0].story as string) ?? '' }
+  },
+
   async fetchPage(ncode: string, page: string | number) {
-    const res = await fetch(`https://novel18.syosetu.com/${ncode}/${page}/`, {
-      headers: { Cookie: 'over18=yes' },
-    })
+    const opts = { headers: { Cookie: 'over18=yes' } }
+    let res = await fetch(`https://novel18.syosetu.com/${ncode}/${page}/`, opts)
+    if (res.status === 404) {
+      res = await fetch(`https://novel18.syosetu.com/${ncode}/`, opts)
+    }
     if (!res.ok) throw new Error(`nocturne page error: ${res.status}`)
     return parsePage(await res.text(), '.p-novel__text')
   },

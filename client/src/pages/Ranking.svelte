@@ -2,6 +2,7 @@
 	import config from '$lib/config.js';
 	import fetcher from '$lib/fetcher.js';
 	import { navigate } from '$lib/router.svelte.js';
+	import NovelDetailModal from '$lib/components/NovelDetailModal.svelte';
 
 	let { type } = $props();
 
@@ -18,13 +19,20 @@
 	let activeGenre = $state(null);
 	let loading = $state(false);
 	let error = $state(null);
+	let selectedNovel = $state(null);
+	let favIds = $state(new Set());
 	let genres = $derived(ranking ? Object.keys(ranking) : []);
 
 	async function loadRanking(t, period) {
 		loading = true;
 		error = null;
 		try {
-			ranking = await fetcher(`${config.path.api}/novel/${t}/ranking?period=${period}`);
+			const [rankingData, favorites] = await Promise.all([
+				fetcher(`${config.path.api}/novel/${t}/ranking?period=${period}`),
+				fetcher(`${config.path.api}/favorites`).catch(() => []),
+			]);
+			ranking = rankingData;
+			favIds = new Set(favorites.filter((f) => f.type === t).map((f) => f.id));
 			const keys = Object.keys(ranking);
 			activeGenre = keys.length > 1 ? keys[0] : null;
 		} catch (e) {
@@ -44,16 +52,25 @@
 		navigate(`/novel/${type}/${id}/${num}`);
 	}
 
-	async function addFavorite(e, novel) {
+	function updateFavIds(id) {
+		favIds.has(id) ? favIds.delete(id) : favIds.add(id);
+		favIds = new Set(favIds);
+	}
+
+	async function toggleFavorite(e, novel) {
 		e.stopPropagation();
-		const btn = e.currentTarget;
+		const isFav = favIds.has(novel.id);
 		try {
-			await fetcher(`${config.path.api}/favorites/${type}/${novel.id}`, {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ title: novel.title, page: novel.page }),
-			});
-			btn.textContent = '★';
+			if (isFav) {
+				await fetcher(`${config.path.api}/favorites/${type}/${novel.id}`, { method: 'DELETE' });
+			} else {
+				await fetcher(`${config.path.api}/favorites/${type}/${novel.id}`, {
+					method: 'PUT',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ title: novel.title, page: novel.page }),
+				});
+			}
+			updateFavIds(novel.id);
 		} catch (err) {
 			alert(err.message);
 		}
@@ -107,12 +124,12 @@
 				</thead>
 				<tbody>
 					{#each novels as novel, i}
-						<tr onclick={() => goToReader(novel.id)} class="clickable">
+						<tr onclick={() => selectedNovel = novel} class="clickable">
 							<td class="col-rank">{i + 1}</td>
 							<td class="col-title">{novel.title}</td>
-							<td class="col-page">{novel.page}</td>
+							<td class="col-page" class:tanpen={novel.noveltype === 2}>{novel.noveltype === 2 ? '短編' : novel.page}</td>
 							<td class="col-fav">
-								<button class="fav-btn" onclick={(e) => addFavorite(e, novel)}>☆</button>
+								<button class="fav-btn" onclick={(e) => toggleFavorite(e, novel)}>{favIds.has(novel.id) ? '★' : '☆'}</button>
 							</td>
 						</tr>
 					{/each}
@@ -121,6 +138,16 @@
 		{/each}
 	{/if}
 </div>
+
+{#if selectedNovel}
+	<NovelDetailModal
+		{type}
+		novel={selectedNovel}
+		isFav={favIds.has(selectedNovel.id)}
+		onToggleFav={updateFavIds}
+		onclose={() => selectedNovel = null}
+	/>
+{/if}
 
 <style lang="sass">
 .ranking
@@ -279,4 +306,6 @@
 			content: "全"
 		&::after
 			content: "話"
+		&:global(.tanpen)::before, &:global(.tanpen)::after
+			content: none
 </style>

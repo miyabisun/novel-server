@@ -7,6 +7,7 @@ import { getCookie } from 'hono/cookie'
 
 import ranking from './routes/ranking.js'
 import pages from './routes/pages.js'
+import detail from './routes/detail.js'
 import auth from './routes/auth.js'
 import favorites from './routes/favorites.js'
 import { getIndexHtml } from './lib/spa.js'
@@ -44,6 +45,7 @@ sub.use('/api/*', async (c, next) => {
 sub.route('/', auth)
 sub.route('/', ranking)
 sub.route('/', pages)
+sub.route('/', detail)
 sub.route('/', favorites)
 
 // Static files & SPA fallback

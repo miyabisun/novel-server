@@ -110,6 +110,36 @@ Cookie を削除してログアウトします。
 
 ---
 
+## 小説詳細 (Detail)
+
+### GET `/api/novel/:type/:id/detail`
+
+小説のタイトルとあらすじを取得します。結果は 24 時間キャッシュされます。
+
+**パラメータ:**
+
+| 名前 | 型 | 説明 |
+|------|-----|------|
+| `type` | `string` | 対象サイト (`narou` / `kakuyomu` / `nocturne`) |
+| `id` | `string` | 小説 ID |
+
+**レスポンス (200):**
+
+```json
+{
+  "title": "小説タイトル",
+  "synopsis": "あらすじテキスト..."
+}
+```
+
+**エラー (502):**
+
+```json
+{ "error": "Failed to fetch detail" }
+```
+
+---
+
 ## ページ (Pages)
 
 ### GET `/api/novel/:type/:id/pages/:num`

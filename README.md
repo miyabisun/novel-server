@@ -51,7 +51,7 @@ Open `http://localhost:3000` to see the login screen.
 
 ## Features
 
-- **Rankings** — Browse rankings from Narou / Kakuyomu / Nocturne with period selection (daily / weekly / monthly / quarter / yearly)
+- **Rankings** — Browse rankings from Narou / Kakuyomu / Nocturne with period selection and synopsis preview modal
 - **Reader** — Keyboard-navigable (arrow keys) page turning
 - **Favorites** — Add from rankings with ★, manage and remove from list
 - **Reading Progress** — Automatically saved when a page loads in the reader

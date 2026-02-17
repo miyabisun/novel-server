@@ -46,5 +46,10 @@ export function createFetchApi(apiUrl: string) {
 
 export function parsePage(html: string, selector: string): string | null {
   const $ = cheerio.load(html)
-  return $(selector).html()
+  const parts: string[] = []
+  $(selector).each((_i, el) => {
+    const h = $(el).html()
+    if (h) parts.push(h)
+  })
+  return parts.length ? parts.join('<hr>') : null
 }

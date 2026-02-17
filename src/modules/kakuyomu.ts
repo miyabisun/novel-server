@@ -16,12 +16,12 @@ function parseApolloState(html: string): Record<string, any> {
   return JSON.parse(raw).props.pageProps.__APOLLO_STATE__
 }
 
-function extractWork(apollo: Record<string, any>) {
-  const workKey = Object.keys(apollo).find((k) => k.startsWith('Work:'))
-  if (!workKey) throw new Error('Work not found in Apollo state')
-  const work = apollo[workKey]
+function extractWork(apollo: Record<string, any>, id: string) {
+  const work = apollo[`Work:${id}`]
+  if (!work) throw new Error('Work not found in Apollo state')
   return {
     title: work.title as string,
+    story: (work.introduction ?? '') as string,
     novelupdated_at: work.lastEpisodePublishedAt
       ? format(parseISO(work.lastEpisodePublishedAt), 'yyyy-MM-dd HH:mm:ss')
       : undefined,
@@ -66,11 +66,21 @@ const kakuyomu = {
     return { '総合': await kakuyomu.fetchRanking('all', period) }
   },
 
-  async fetchDatum(id: string) {
+  async fetchWork(id: string) {
     const res = await fetch(`https://kakuyomu.jp/works/${id}`, { headers })
     if (!res.ok) throw new Error(`kakuyomu work error: ${res.status}`)
-    const apollo = parseApolloState(await res.text())
-    const work = extractWork(apollo)
+    return parseApolloState(await res.text())
+  },
+
+  async fetchDetail(id: string) {
+    const apollo = await kakuyomu.fetchWork(id)
+    const work = extractWork(apollo, id)
+    return { title: work.title, synopsis: work.story }
+  },
+
+  async fetchDatum(id: string) {
+    const apollo = await kakuyomu.fetchWork(id)
+    const work = extractWork(apollo, id)
     const pages = extractEpisodes(apollo, id)
     return { type, id, ...work, pages }
   },
@@ -84,8 +94,18 @@ const kakuyomu = {
     return results
   },
 
-  async fetchPage(id: string, pageId: string) {
-    const res = await fetch(`https://kakuyomu.jp/works/${id}/episodes/${pageId}`, { headers })
+  async fetchPage(id: string, pageId: string | number) {
+    let episodeId = String(pageId)
+    const num = Number(pageId)
+    // Episode IDs are 18+ digit numbers; small numbers are sequential page numbers that need resolution
+    if (Number.isInteger(num) && num < 100000) {
+      const apollo = await kakuyomu.fetchWork(id)
+      const episodes = extractEpisodes(apollo, id)
+      const ep = episodes[num - 1]
+      if (!ep) throw new Error(`Episode ${pageId} not found`)
+      episodeId = ep.page_id as string
+    }
+    const res = await fetch(`https://kakuyomu.jp/works/${id}/episodes/${episodeId}`, { headers })
     if (!res.ok) throw new Error(`kakuyomu episode error: ${res.status}`)
     const $ = cheerio.load(await res.text())
     return $('.widget-episodeBody').html()

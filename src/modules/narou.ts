@@ -12,7 +12,7 @@ const narou = {
   fetchApi,
 
   fetchRanking(genre: string | number, limit: number, order: string = 'dailypoint') {
-    return fetchApi({ of: 't-w-n-ga', lim: limit, order, genre })
+    return fetchApi({ of: ['t', 'w', 'n', 'ga', 'nt'], lim: limit, order, genre })
   },
 
   async fetchRankingList(limit: number = 100, period: string = 'daily') {
@@ -40,8 +40,17 @@ const narou = {
     return data.map(toDatum)
   },
 
+  async fetchDetail(id: string) {
+    const data = await fetchApi({ of: 't-s', ncode: id })
+    if (!data[0]) throw new Error('Novel not found')
+    return { title: data[0].title as string, synopsis: (data[0].story as string) ?? '' }
+  },
+
   async fetchPage(ncode: string, page: string | number) {
-    const res = await fetch(`https://ncode.syosetu.com/${ncode}/${page}/`)
+    let res = await fetch(`https://ncode.syosetu.com/${ncode}/${page}/`)
+    if (res.status === 404) {
+      res = await fetch(`https://ncode.syosetu.com/${ncode}/`)
+    }
     if (!res.ok) throw new Error(`narou page error: ${res.status}`)
     return parsePage(await res.text(), '.p-novel__text')
   },
