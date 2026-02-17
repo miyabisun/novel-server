@@ -58,7 +58,7 @@ novel-server/
 `src/modules/` 内の各モジュールは以下のインターフェースを実装しています:
 
 - `fetchRankingList(limit?, period?)` — ランキングデータを取得してジャンル別にグループ化（period: `daily` / `weekly` / `monthly` / `quarter` / `yearly`）
-- `fetchDetail(id)` — 小説のタイトルとあらすじを取得
+- `fetchDetail(id)` — 小説のタイトル・あらすじ・総ページ数を取得
 - `fetchPage(id, num)` — 小説の本文 HTML を取得
 
 ### キャッシュ戦略
