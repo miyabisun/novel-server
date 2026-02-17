@@ -3,17 +3,53 @@ import { format, parseISO } from 'date-fns'
 
 const UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 const headers = { 'User-Agent': UA }
+const type = 'kakuyomu'
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+function parseApolloState(html: string): Record<string, any> {
+  const $ = cheerio.load(html)
+  const raw = $('#__NEXT_DATA__').text()
+  if (!raw) throw new Error('Failed to parse kakuyomu work page')
+  return JSON.parse(raw).props.pageProps.__APOLLO_STATE__
+}
+
+function extractWork(apollo: Record<string, any>) {
+  const workKey = Object.keys(apollo).find((k) => k.startsWith('Work:'))
+  if (!workKey) throw new Error('Work not found in Apollo state')
+  const work = apollo[workKey]
+  return {
+    title: work.title as string,
+    novelupdated_at: work.lastEpisodePublishedAt
+      ? format(parseISO(work.lastEpisodePublishedAt), 'yyyy-MM-dd HH:mm:ss')
+      : undefined,
+  }
+}
+
+function extractEpisodes(apollo: Record<string, any>, id: string) {
+  const pages: Record<string, unknown>[] = []
+  const tocKeys = Object.keys(apollo).filter((k) => k.startsWith('TableOfContentsChapter'))
+  let num = 0
+  for (const tocKey of tocKeys) {
+    for (const epRef of apollo[tocKey].episodeUnions || []) {
+      const ref = epRef.__ref as string
+      if (!ref || !apollo[ref]) continue
+      const ep = apollo[ref]
+      num++
+      pages.push({ type, id, num, page_id: ep.id as string, title: ep.title as string })
+    }
+  }
+  return pages
+}
+
 const kakuyomu = {
-  async fetchRanking(genre: string, type: string) {
-    const result: Record<string, unknown>[] = []
-    const res = await fetch(`https://kakuyomu.jp/rankings/${genre}/${type}`, { headers })
+  async fetchRanking(genre: string, rankType: string) {
+    const res = await fetch(`https://kakuyomu.jp/rankings/${genre}/${rankType}`, { headers })
     if (!res.ok) throw new Error(`kakuyomu ranking error: ${res.status}`)
     const $ = cheerio.load(await res.text())
+    const result: Record<string, unknown>[] = []
     $('.widget-work').each((_i, elem) => {
       const $e = $(elem)
       result.push({
@@ -26,56 +62,16 @@ const kakuyomu = {
   },
 
   async fetchRankingList() {
-    return {
-      '総合': await kakuyomu.fetchRanking('all', 'weekly'),
-    }
+    return { '総合': await kakuyomu.fetchRanking('all', 'weekly') }
   },
 
   async fetchDatum(id: string) {
     const res = await fetch(`https://kakuyomu.jp/works/${id}`, { headers })
     if (!res.ok) throw new Error(`kakuyomu work error: ${res.status}`)
-    const html = await res.text()
-    const type = 'kakuyomu'
-
-    // Work page is CSR — extract data from __NEXT_DATA__ Apollo state
-    const match = html.match(/<script id="__NEXT_DATA__"[^>]*>(.*?)<\/script>/)
-    if (!match) throw new Error('Failed to parse kakuyomu work page')
-
-    const nextData = JSON.parse(match[1])
-    const apollo: Record<string, any> = nextData.props.pageProps.__APOLLO_STATE__
-
-    // Find Work entry
-    const workKey = Object.keys(apollo).find((k) => k.startsWith('Work:'))
-    if (!workKey) throw new Error('Work not found in Apollo state')
-    const work = apollo[workKey]
-
-    const title = work.title as string
-    const novelupdated_at = work.lastEpisodePublishedAt
-      ? format(parseISO(work.lastEpisodePublishedAt), 'yyyy-MM-dd HH:mm:ss')
-      : undefined
-
-    // Collect episodes from TableOfContentsChapter entries
-    const pages: Record<string, unknown>[] = []
-    const tocKeys = Object.keys(apollo).filter((k) => k.startsWith('TableOfContentsChapter'))
-    let num = 0
-    for (const tocKey of tocKeys) {
-      const toc = apollo[tocKey]
-      for (const epRef of toc.episodeUnions || []) {
-        const ref = epRef.__ref as string
-        if (!ref || !apollo[ref]) continue
-        const ep = apollo[ref]
-        num++
-        pages.push({
-          type,
-          id,
-          num,
-          page_id: ep.id as string,
-          title: ep.title as string,
-        })
-      }
-    }
-
-    return { type, id, title, novelupdated_at, pages }
+    const apollo = parseApolloState(await res.text())
+    const work = extractWork(apollo)
+    const pages = extractEpisodes(apollo, id)
+    return { type, id, ...work, pages }
   },
 
   async fetchData(ids: string[]) {

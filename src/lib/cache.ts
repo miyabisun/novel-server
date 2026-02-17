@@ -3,7 +3,21 @@ interface CacheEntry {
   expiresAt: number | null
 }
 
+const MAX_ENTRIES = 10000
+const SWEEP_INTERVAL = 60 * 60 * 1000 // 1 hour
+
 const store = new Map<string, CacheEntry>()
+
+function sweep() {
+  const now = Date.now()
+  for (const [key, entry] of store) {
+    if (entry.expiresAt && now > entry.expiresAt) {
+      store.delete(key)
+    }
+  }
+}
+
+setInterval(sweep, SWEEP_INTERVAL).unref()
 
 export default {
   get(key: string): unknown | null {
@@ -17,6 +31,10 @@ export default {
   },
 
   set(key: string, value: unknown, ttlSeconds?: number): void {
+    if (store.size >= MAX_ENTRIES && !store.has(key)) {
+      const oldest = store.keys().next().value!
+      store.delete(oldest)
+    }
     store.set(key, {
       value,
       expiresAt: ttlSeconds ? Date.now() + ttlSeconds * 1000 : null,

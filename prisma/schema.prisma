@@ -18,14 +18,3 @@ model Favorite {
   @@id([type, id])
   @@map("favorites")
 }
-
-model Page {
-  type    String
-  id      String
-  num     Int
-  page_id String
-  title   String
-
-  @@id([type, id, num])
-  @@map("pages")
-}

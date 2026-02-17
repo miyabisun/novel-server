@@ -1,81 +1,83 @@
 # novel-server
 
-なろう・カクヨム・ノクターンに対応した小説ランキングビューア＆リーダー。
-お気に入り管理と既読位置の自動記録機能付き。
+A novel ranking viewer & reader supporting Narou, Kakuyomu, and Nocturne.
+Includes favorites management and automatic reading progress tracking.
 
-## 技術スタック
+[日本語](README.ja.md)
 
-- **バックエンド**: Hono + TypeScript + Prisma (SQLite)
-- **フロントエンド**: Svelte 5 + Vite + Sass
-- **認証**: JWT (HS256) + HttpOnly Cookie
+## Tech Stack
 
-## セットアップ
+- **Backend**: Hono + TypeScript + Prisma (SQLite)
+- **Frontend**: Svelte 5 + Vite + Sass
+- **Auth**: JWT (HS256) + HttpOnly Cookie
 
-```bash
-npm install
-cd client && npm install && cd ..
-```
+## Setup
 
-### 環境変数
-
-`.env` を作成して以下を設定（全て必須）:
-
-```env
-PORT=3000
-DATABASE_URL="file:./novel.db"
-AUTH_USERNAME=admin
-AUTH_PASSWORD=<パスワード>
-JWT_SECRET=<ランダムな秘密鍵（32文字以上推奨）>
-```
-
-`AUTH_USERNAME`、`AUTH_PASSWORD`、`JWT_SECRET` が未設定の場合、サーバーは起動時にエラーで停止します。
-
-### データベース
+Run the following command to install dependencies, generate `.env`, and initialize the database:
 
 ```bash
-npm run db:push
+./scripts/install.sh
 ```
 
-## 起動
+You will be prompted to set `AUTH_PASSWORD` only if `.env` does not exist (leave blank to auto-generate).
+Safe to re-run on an already configured environment.
+
+### Manual Setup
+
+To run each step individually:
 
 ```bash
-# 開発（フロントエンドのホットリビルド付き）
+npm install                # Server dependencies
+cd client && npm install   # Client dependencies
+npm run init               # Generate .env interactively
+npm run db:push            # Sync Prisma schema to DB
+```
+
+To create `.env` manually, refer to `.env.example`.
+The server will fail to start if `AUTH_USERNAME`, `AUTH_PASSWORD`, or `JWT_SECRET` is not set.
+
+## Running
+
+```bash
+# Development (with frontend hot rebuild)
 npm run dev
 
-# 本番
+# Production
 npm run build
 npm start
 ```
 
-`http://localhost:3000` にアクセスするとログイン画面が表示されます。
+Open `http://localhost:3000` to see the login screen.
 
-## 主な機能
+## Features
 
-- **ランキング閲覧** — なろう / カクヨム / ノクターンの日間ランキングをタブ切替で表示
-- **小説リーダー** — キーボード（矢印キー）対応のページ送り
-- **お気に入り** — ランキングから★で追加、一覧から管理・削除
-- **既読位置記録** — リーダーでページ読み込み成功時に自動で進捗を保存
-- **認証** — 全 API がログイン必須（シングルユーザー）
+- **Rankings** — Browse daily rankings from Narou / Kakuyomu / Nocturne with tab switching
+- **Reader** — Keyboard-navigable (arrow keys) page turning
+- **Favorites** — Add from rankings with ★, manage and remove from list
+- **Reading Progress** — Automatically saved when a page loads in the reader
+- **Auth** — All APIs require login (single user)
 
-## npm scripts
+## Commands
 
-| コマンド | 説明 |
-|---------|------|
-| `npm run dev` | 開発サーバー起動（vite watch + node） |
-| `npm run build` | フロントエンドビルド |
-| `npm start` | 本番サーバー起動 |
-| `npm run db:push` | Prisma スキーマを DB に同期 |
+| Command | Description |
+|---------|-------------|
+| `./scripts/install.sh` | Run full initial setup |
+| `npm run dev` | Start dev server (vite watch + node) |
+| `npm run build` | Build frontend |
+| `npm start` | Start production server |
+| `npm run db:push` | Sync Prisma schema to DB |
+| `npm run init` | Generate `.env` interactively |
 
-## リバースプロキシ配下での運用
+## Reverse Proxy
 
-`BASE_PATH` を設定するとサブパスで動作します:
+Set `BASE_PATH` to serve under a subpath:
 
 ```env
 BASE_PATH=/novels
 ```
 
-## ドキュメント
+## Documentation
 
-- [API リファレンス](docs/api.md)
-- [認証の仕組み](docs/authentication.md)
-- [アーキテクチャ](docs/architecture.md)
+- [API Reference](docs/api.md)
+- [Authentication](docs/authentication.md)
+- [Architecture](docs/architecture.md)

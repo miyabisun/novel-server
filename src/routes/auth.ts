@@ -1,6 +1,17 @@
+import { timingSafeEqual } from 'node:crypto'
 import { Hono } from 'hono'
 import { sign } from 'hono/jwt'
 import { setCookie, deleteCookie } from 'hono/cookie'
+
+function safeEqual(a: string, b: string): boolean {
+  const bufA = Buffer.from(a)
+  const bufB = Buffer.from(b)
+  if (bufA.length !== bufB.length) {
+    timingSafeEqual(bufA, bufA) // constant time even on length mismatch
+    return false
+  }
+  return timingSafeEqual(bufA, bufB)
+}
 
 const app = new Hono()
 
@@ -13,8 +24,9 @@ app.post('/api/auth/login', async (c) => {
   }
   const { username, password } = body
   if (
-    username !== process.env.AUTH_USERNAME ||
-    password !== process.env.AUTH_PASSWORD
+    !username || !password ||
+    !safeEqual(username, process.env.AUTH_USERNAME!) ||
+    !safeEqual(password, process.env.AUTH_PASSWORD!)
   ) {
     return c.json({ error: 'Invalid credentials' }, 401)
   }

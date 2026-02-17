@@ -1,5 +1,4 @@
 <script>
-	import 'normalize.css';
 	import { router, navigate, getBasePath } from '$lib/router.svelte.js';
 	import { auth, checkAuth } from '$lib/auth.svelte.js';
 	import Header from '$lib/components/Header.svelte';
@@ -58,55 +57,6 @@
 {/if}
 
 <style lang="sass">
-:global
-	*,
-	*::before,
-	*::after
-		box-sizing: border-box
-
-	body
-		background-color: #222
-		color: rgba(255, 255, 255, 0.85)
-		font-size: clamp(12px, 1vw, 18px)
-		line-height: 1.5715
-
-	h1, h2, h3, h4, h5, h6
-		color: rgba(255, 255, 255, 0.85)
-
-	a
-		color: rgba(128, 192, 255, 0.85)
-		text-decoration: none
-
-		&:hover
-			color: rgba(192, 222, 255, 0.85)
-
-	table
-		table-layout: fixed
-		border-collapse: collapse
-		width: 100%
-
-		thead th
-			padding: 2px 4px
-			border-bottom: 3px gray double
-			font-size: 0.9rem
-
-		tbody td
-			padding: 2px 4px
-			vertical-align: top
-
-		tr
-			&:hover
-				background-color: rgba(255, 255, 255, 0.2)
-
-	ul
-		margin: 0
-		padding: 0
-		list-style: none
-
-	li
-		margin: 0
-		padding: 0
-
 .loading
 	text-align: center
 	padding: 40px

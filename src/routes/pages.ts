@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import * as cheerio from 'cheerio'
 import cache from '../lib/cache.js'
 import M from '../modules/index.js'
 
@@ -7,12 +8,35 @@ const app = new Hono()
 const VALID_TYPES = Object.keys(M)
 const PAGE_TTL = 60 * 60 * 24 // 24 hours
 
+// cheerio.load() が生成する構造タグ + コンテンツ許可タグ
+const ALLOWED_TAGS = new Set([
+  'html', 'head', 'body',
+  'p', 'br', 'div', 'span',
+  'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+  'ruby', 'rt', 'rp', 'rb',
+  'em', 'strong', 'b', 'i', 'u', 's', 'sub', 'sup',
+])
+
 function sanitizeHtml(html: string | null): string {
   if (!html) return ''
-  return html
-    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
-    .replace(/<iframe\b[^>]*>[\s\S]*?<\/iframe>/gi, '')
-    .replace(/\s+on\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]*)/gi, '')
+  const $ = cheerio.load(html, { xml: false })
+  // Repeat until no disallowed tags remain (handles nested unwrapping)
+  let dirty = true
+  while (dirty) {
+    dirty = false
+    $('*').each((_i, el) => {
+      if (el.type !== 'tag') return
+      if (!ALLOWED_TAGS.has(el.tagName)) {
+        $(el).replaceWith($(el).contents())
+        dirty = true
+      } else {
+        for (const attr of Object.keys(el.attribs)) {
+          $(el).removeAttr(attr)
+        }
+      }
+    })
+  }
+  return $('body').html() ?? ''
 }
 
 app.get('/api/novel/:type/:id/pages/:num', async (c) => {

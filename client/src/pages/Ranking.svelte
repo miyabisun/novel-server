@@ -6,6 +6,7 @@
 	const types = ['narou', 'kakuyomu', 'nocturne'];
 	let activeType = $state('narou');
 	let ranking = $state(null);
+	let activeGenre = $state(null);
 	let loading = $state(false);
 	let error = $state(null);
 
@@ -14,6 +15,8 @@
 		error = null;
 		try {
 			ranking = await fetcher(`${config.path.api}/novel/${type}/ranking`);
+			const genres = Object.keys(ranking);
+			activeGenre = genres.length > 1 ? genres[0] : null;
 		} catch (e) {
 			error = e.message;
 			ranking = null;
@@ -66,32 +69,42 @@
 	{:else if error}
 		<p class="status error">{error}</p>
 	{:else if ranking}
-		{#each Object.entries(ranking) as [genre, novels]}
-			<section class="genre">
-				<h2>{genre}</h2>
-				<table>
-					<thead>
-						<tr>
-							<th class="col-fav"></th>
-							<th class="col-rank">#</th>
-							<th class="col-title">タイトル</th>
-							<th class="col-page">話数</th>
+		{@const genres = Object.keys(ranking)}
+		{#if genres.length > 1}
+			<div class="genre-tabs">
+				{#each genres as genre}
+					<button
+						class="genre-tab"
+						class:active={activeGenre === genre}
+						onclick={() => activeGenre = genre}
+					>{genre}</button>
+				{/each}
+			</div>
+		{/if}
+		{@const visibleGenres = activeGenre ? [[activeGenre, ranking[activeGenre] ?? []]] : Object.entries(ranking)}
+		{#each visibleGenres as [genre, novels]}
+			<table>
+				<thead>
+					<tr>
+						<th class="col-fav"></th>
+						<th class="col-rank">#</th>
+						<th class="col-title">タイトル</th>
+						<th class="col-page">話数</th>
+					</tr>
+				</thead>
+				<tbody>
+					{#each novels as novel, i}
+						<tr onclick={() => goToReader(activeType, novel.id)} class="clickable">
+							<td class="col-fav">
+								<button class="fav-btn" onclick={(e) => addFavorite(e, novel)}>☆</button>
+							</td>
+							<td class="col-rank">{i + 1}</td>
+							<td class="col-title">{novel.title}</td>
+							<td class="col-page">{novel.page}</td>
 						</tr>
-					</thead>
-					<tbody>
-						{#each novels as novel, i}
-							<tr onclick={() => goToReader(activeType, novel.id)} class="clickable">
-								<td class="col-fav">
-									<button class="fav-btn" onclick={(e) => addFavorite(e, novel)}>☆</button>
-								</td>
-								<td class="col-rank">{i + 1}</td>
-								<td class="col-title">{novel.title}</td>
-								<td class="col-page">{novel.page}</td>
-							</tr>
-						{/each}
-					</tbody>
-				</table>
-			</section>
+					{/each}
+				</tbody>
+			</table>
 		{/each}
 	{/if}
 </div>
@@ -129,14 +142,28 @@
 	&.error
 		color: #ff6b6b
 
-.genre
-	margin-bottom: 24px
+.genre-tabs
+	display: flex
+	gap: 4px
+	margin-bottom: 12px
+	flex-wrap: wrap
 
-	h2
-		font-size: 1.1rem
-		margin: 0 0 8px 0
-		border-bottom: 1px solid #555
-		padding-bottom: 4px
+.genre-tab
+	padding: 4px 12px
+	border: 1px solid #444
+	background: transparent
+	color: rgba(255, 255, 255, 0.6)
+	cursor: pointer
+	border-radius: 3px
+	font-size: 0.85rem
+
+	&:hover
+		background: rgba(255, 255, 255, 0.08)
+
+	&.active
+		background: rgba(255, 255, 255, 0.15)
+		color: white
+		border-color: rgba(128, 192, 255, 0.5)
 
 .col-fav
 	width: 30px
