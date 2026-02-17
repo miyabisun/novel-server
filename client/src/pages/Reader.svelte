@@ -47,7 +47,6 @@
 		fetch(`${config.path.api}/favorites/${type}/${id}/progress`, {
 			method: 'PATCH',
 			headers: { 'Content-Type': 'application/json' },
-			credentials: 'include',
 			body: JSON.stringify({ read: Number(num) }),
 		}).catch(() => {});
 	}

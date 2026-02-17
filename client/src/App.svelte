@@ -1,22 +1,9 @@
 <script>
 	import { router, navigate, getBasePath } from '$lib/router.svelte.js';
-	import { auth, checkAuth } from '$lib/auth.svelte.js';
 	import Header from '$lib/components/Header.svelte';
 	import Ranking from './pages/Ranking.svelte';
 	import Reader from './pages/Reader.svelte';
-	import Login from './pages/Login.svelte';
 	import Favorites from './pages/Favorites.svelte';
-
-	checkAuth();
-
-	$effect(() => {
-		if (auth.loading) return;
-		if (!auth.authenticated && router.index !== 1) {
-			navigate('/login');
-		} else if (auth.authenticated && router.index === 1) {
-			navigate('/');
-		}
-	});
 
 	$effect(() => {
 		function handleClick(e) {
@@ -41,24 +28,11 @@
 	});
 </script>
 
-{#if auth.loading}
-	<p class="loading">読み込み中...</p>
+<Header />
+{#if router.index === 0}
+	<Favorites />
 {:else if router.index === 1}
-	<Login />
-{:else}
-	<Header />
-	{#if router.index === 0}
-		<Favorites />
-	{:else if router.index === 2}
-		<Ranking type={router.params.type} />
-	{:else if router.index === 3}
-		<Reader params={router.params} />
-	{/if}
+	<Ranking type={router.params.type} />
+{:else if router.index === 2}
+	<Reader params={router.params} />
 {/if}
-
-<style lang="sass">
-.loading
-	text-align: center
-	padding: 40px
-	color: rgba(255, 255, 255, 0.6)
-</style>

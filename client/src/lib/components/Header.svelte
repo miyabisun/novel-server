@@ -1,6 +1,5 @@
 <script>
 	import { router, link } from '$lib/router.svelte.js';
-	import { logout } from '$lib/auth.svelte.js';
 
 	const navItems = [
 		{ label: 'favorite', href: '/' },
@@ -11,7 +10,7 @@
 
 	function isActive(item) {
 		if (item.href === '/') return router.index === 0;
-		return router.index === 2 && router.params.type === item.label;
+		return router.index === 1 && router.params.type === item.label;
 	}
 </script>
 
@@ -26,7 +25,6 @@
 			>{item.label}</a>
 		{/each}
 	</nav>
-	<button class="logout-btn" onclick={logout}>logout</button>
 </header>
 
 <style lang="sass">
@@ -72,16 +70,4 @@ header
 	&.active
 		color: white
 		border-bottom-color: rgba(128, 192, 255, 0.7)
-
-.logout-btn
-	padding: 4px 12px
-	border: 1px solid #555
-	background: transparent
-	color: rgba(255, 255, 255, 0.7)
-	cursor: pointer
-	border-radius: 4px
-	font-size: 0.85rem
-
-	&:hover
-		background: rgba(255, 255, 255, 0.1)
 </style>

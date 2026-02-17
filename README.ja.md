@@ -7,7 +7,6 @@
 
 - **バックエンド**: Hono + TypeScript + Prisma (SQLite)
 - **フロントエンド**: Svelte 5 + Vite + Sass
-- **認証**: JWT (HS256) + HttpOnly Cookie
 
 ## セットアップ
 
@@ -17,7 +16,6 @@
 ./scripts/install.sh
 ```
 
-`.env` が存在しない場合のみ対話的に `AUTH_PASSWORD` の入力を求められます（空欄で自動生成）。
 既にセットアップ済みの環境で再実行しても安全です。
 
 ### 手動セットアップ
@@ -27,12 +25,11 @@
 ```bash
 npm install                # サーバー側の依存関係
 cd client && npm install   # クライアント側の依存関係
-npm run init               # .env を対話的に生成
+npm run init               # .env を生成
 npm run db:push            # Prisma スキーマを DB に同期
 ```
 
 `.env` を手動で作成する場合は `.env.example` を参考にしてください。
-`AUTH_USERNAME`、`AUTH_PASSWORD`、`JWT_SECRET` が未設定の場合、サーバーは起動時にエラーで停止します。
 
 ## 起動
 
@@ -45,7 +42,7 @@ npm run build
 npm start
 ```
 
-`http://localhost:3000` にアクセスするとログイン画面が表示されます。
+`http://localhost:3000` にアクセスするとアプリケーションが表示されます。
 
 ## 主な機能
 
@@ -53,7 +50,6 @@ npm start
 - **小説リーダー** — キーボード（矢印キー）対応のページ送り
 - **お気に入り** — ランキングから★で追加、一覧から管理・削除
 - **既読位置記録** — リーダーでページ読み込み成功時に自動で進捗を保存
-- **認証** — 全 API がログイン必須（シングルユーザー）
 
 ## コマンド一覧
 
@@ -64,7 +60,7 @@ npm start
 | `npm run build` | フロントエンドビルド |
 | `npm start` | 本番サーバー起動 |
 | `npm run db:push` | Prisma スキーマを DB に同期 |
-| `npm run init` | `.env` を対話的に生成 |
+| `npm run init` | `.env` を生成 |
 
 ## リバースプロキシ配下での運用
 
@@ -77,5 +73,4 @@ BASE_PATH=/novels
 ## ドキュメント
 
 - [API リファレンス](docs/api.md)
-- [認証の仕組み](docs/authentication.md)
 - [アーキテクチャ](docs/architecture.md)

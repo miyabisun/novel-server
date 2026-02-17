@@ -15,19 +15,17 @@ novel-server/
 │   │   ├── kakuyomu.ts         # カクヨムスクレイピング
 │   │   └── nocturne.ts         # ノクターンスクレイピング
 │   └── routes/
-│       ├── auth.ts             # 認証 API
 │       ├── detail.ts           # 小説詳細 API
 │       ├── favorites.ts        # お気に入り CRUD
 │       ├── ranking.ts          # ランキング API
 │       └── pages.ts            # 小説本文 API
 ├── client/                     # フロントエンド（Svelte 5）
 │   ├── src/
-│   │   ├── App.svelte          # ルートコンポーネント、認証ガード
+│   │   ├── App.svelte          # ルートコンポーネント
 │   │   ├── main.js             # エントリポイント
 │   │   ├── lib/
-│   │   │   ├── auth.svelte.js  # 認証状態管理（$state）
 │   │   │   ├── config.js       # API パス設定
-│   │   │   ├── fetcher.js      # fetch ラッパー（401 ハンドリング）
+│   │   │   ├── fetcher.js      # fetch ラッパー
 │   │   │   ├── router.svelte.js # SPA ルーター
 │   │   │   └── components/
 │   │   │       ├── Header.svelte
@@ -35,7 +33,6 @@ novel-server/
 │   │   └── pages/
 │   │       ├── Ranking.svelte  # ランキング一覧
 │   │       ├── Reader.svelte   # 小説リーダー
-│   │       ├── Login.svelte    # ログインフォーム
 │   │       └── Favorites.svelte # お気に入り一覧
 │   └── build/                  # ビルド出力（git 管理外）
 ├── prisma/
@@ -50,10 +47,8 @@ novel-server/
 
 ```
 リクエスト
-  → cors (credentials: true)
   → logger
   → [basePath でルーティング]
-  → JWT ミドルウェア (/api/* のみ、/api/auth/login は除外)
   → ルートハンドラ
   → レスポンス
 ```
@@ -112,23 +107,18 @@ SQLite + Prisma を使用。テーブルは 2 つ:
 | Index | パス | ページ |
 |-------|------|--------|
 | 0 | `/` | Favorites |
-| 1 | `/login` | Login |
-| 2 | `/ranking/:type` | Ranking |
-| 3 | `/novel/:type/:id/:num` | Reader |
+| 1 | `/ranking/:type` | Ranking |
+| 2 | `/novel/:type/:id/:num` | Reader |
 
 ### 状態管理
 
-Svelte 5 の `$state` ルーンを使用。グローバルな状態は以下の 2 つ:
+Svelte 5 の `$state` ルーンを使用。グローバルな状態:
 
 - **router** (`router.svelte.js`) — 現在のルートインデックスとパラメータ
-- **auth** (`auth.svelte.js`) — 認証状態 (`authenticated`, `loading`)
 
 ### API 通信
 
-`fetcher.js` が fetch のラッパーとして機能します:
-
-- `credentials: 'include'` で Cookie を自動送信
-- 401 レスポンスで `/login` に自動リダイレクト
+`fetcher.js` が fetch のラッパーとして機能します。
 
 ### BASE_PATH 対応
 

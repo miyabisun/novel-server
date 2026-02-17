@@ -9,7 +9,6 @@ Includes favorites management and automatic reading progress tracking.
 
 - **Backend**: Hono + TypeScript + Prisma (SQLite)
 - **Frontend**: Svelte 5 + Vite + Sass
-- **Auth**: JWT (HS256) + HttpOnly Cookie
 
 ## Setup
 
@@ -19,7 +18,6 @@ Run the following command to install dependencies, generate `.env`, and initiali
 ./scripts/install.sh
 ```
 
-You will be prompted to set `AUTH_PASSWORD` only if `.env` does not exist (leave blank to auto-generate).
 Safe to re-run on an already configured environment.
 
 ### Manual Setup
@@ -29,12 +27,11 @@ To run each step individually:
 ```bash
 npm install                # Server dependencies
 cd client && npm install   # Client dependencies
-npm run init               # Generate .env interactively
+npm run init               # Generate .env
 npm run db:push            # Sync Prisma schema to DB
 ```
 
 To create `.env` manually, refer to `.env.example`.
-The server will fail to start if `AUTH_USERNAME`, `AUTH_PASSWORD`, or `JWT_SECRET` is not set.
 
 ## Running
 
@@ -47,7 +44,7 @@ npm run build
 npm start
 ```
 
-Open `http://localhost:3000` to see the login screen.
+Open `http://localhost:3000` to access the application.
 
 ## Features
 
@@ -55,7 +52,6 @@ Open `http://localhost:3000` to see the login screen.
 - **Reader** — Keyboard-navigable (arrow keys) page turning
 - **Favorites** — Add from rankings with ★, manage and remove from list
 - **Reading Progress** — Automatically saved when a page loads in the reader
-- **Auth** — All APIs require login (single user)
 
 ## Commands
 
@@ -66,7 +62,7 @@ Open `http://localhost:3000` to see the login screen.
 | `npm run build` | Build frontend |
 | `npm start` | Start production server |
 | `npm run db:push` | Sync Prisma schema to DB |
-| `npm run init` | Generate `.env` interactively |
+| `npm run init` | Generate `.env` |
 
 ## Reverse Proxy
 
@@ -79,5 +75,4 @@ BASE_PATH=/novels
 ## Documentation
 
 - [API Reference](docs/api.md)
-- [Authentication](docs/authentication.md)
 - [Architecture](docs/architecture.md)
