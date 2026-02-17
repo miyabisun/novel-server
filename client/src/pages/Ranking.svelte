@@ -119,7 +119,7 @@
 						<th class="col-rank">#</th>
 						<th class="col-title">タイトル</th>
 						<th class="col-page">話数</th>
-						<th class="col-fav"></th>
+						<th class="col-actions"></th>
 					</tr>
 				</thead>
 				<tbody>
@@ -128,7 +128,8 @@
 							<td class="col-rank">{i + 1}</td>
 							<td class="col-title">{novel.title}</td>
 							<td class="col-page" class:tanpen={novel.noveltype === 2}>{novel.noveltype === 2 ? '短編' : novel.page}</td>
-							<td class="col-fav">
+							<td class="col-actions">
+								<button class="read-btn" onclick={(e) => { e.stopPropagation(); goToReader(novel.id); }}>📘</button>
 								<button class="fav-btn" onclick={(e) => toggleFavorite(e, novel)}>{favIds.has(novel.id) ? '★' : '☆'}</button>
 							</td>
 						</tr>
@@ -213,19 +214,33 @@
 		color: white
 		border-color: rgba(128, 192, 255, 0.5)
 
-.col-fav
-	width: 30px
-	text-align: center
+.col-actions
+	width: 70px
+	text-align: right
+	white-space: nowrap
+
+.read-btn
+	padding: 2px 8px
+	border: 1px solid rgba(128, 192, 255, 0.4)
+	background: transparent
+	cursor: pointer
+	border-radius: 3px
+	font-size: 0.8rem
+
+	&:hover
+		background: rgba(128, 192, 255, 0.15)
 
 .fav-btn
-	padding: 0
-	border: none
+	padding: 2px 6px
+	border: 1px solid rgba(255, 200, 50, 0.3)
 	background: transparent
 	color: rgba(255, 200, 50, 0.8)
 	cursor: pointer
-	font-size: 1.1rem
+	border-radius: 3px
+	font-size: 0.95rem
 
 	&:hover
+		background: rgba(255, 200, 50, 0.1)
 		color: rgba(255, 200, 50, 1)
 
 .col-rank
@@ -277,15 +292,41 @@
 		flex-wrap: wrap
 		align-items: center
 		gap: 4px 8px
-		padding: 8px
+		padding: 8px 40px 8px 8px
 		border: 1px solid #444
 		border-radius: 6px
+		position: relative
 
 	table :global(td)
 		padding: 0
 
-	table :global(.col-fav)
-		display: none
+	table :global(.col-actions)
+		position: absolute
+		right: 0
+		top: 0
+		bottom: 0
+		width: 40px
+		display: flex
+		flex-direction: column
+		gap: 0
+		border-left: 1px solid #444
+
+	table :global(.col-actions .read-btn),
+	table :global(.col-actions .fav-btn)
+		flex: 1
+		width: 100%
+		border: none
+		border-radius: 0
+		display: flex
+		align-items: center
+		justify-content: center
+
+	table :global(.col-actions .read-btn)
+		border-bottom: 1px solid #444
+		border-radius: 0 6px 0 0
+
+	table :global(.col-actions .fav-btn)
+		border-radius: 0 0 6px 0
 
 	table :global(.col-rank)
 		width: auto
@@ -300,12 +341,15 @@
 	table :global(.col-page)
 		width: auto
 		margin-left: auto
+		padding-right: 10px
 		font-size: 0.8rem
 		color: rgba(255, 255, 255, 0.5)
 		&::before
 			content: "全"
 		&::after
 			content: "話"
-		&:global(.tanpen)::before, &:global(.tanpen)::after
+
+	table :global(.col-page.tanpen)
+		&::before, &::after
 			content: none
 </style>

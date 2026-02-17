@@ -12,16 +12,20 @@ app.get('/api/novel/:type/:id/detail', async (c) => {
   if (!VALID_TYPES.includes(type)) return c.json({ error: 'Invalid type' }, 400)
   const key = `novel:${type}:${id}:detail`
 
-  let detail = cache.get(key) as { title: string; synopsis: string } | undefined
-  if (!detail) {
+  const cached = cache.get(key) as { title: string; synopsis: string; page: number } | null
+  if (cached) return c.json(cached)
+
+  for (let i = 0; i < 3; i++) {
     try {
-      detail = await M[type].fetchDetail(id)
+      const detail = await M[type].fetchDetail(id)
       cache.set(key, detail, DETAIL_TTL)
-    } catch {
-      return c.json({ error: 'Failed to fetch detail' }, 502)
+      return c.json(detail)
+    } catch (e) {
+      console.error(`fetchDetail ${type}/${id} attempt ${i + 1} failed:`, e)
+      if (i < 2) await new Promise(r => setTimeout(r, 500 * (i + 1)))
     }
   }
-  return c.json(detail)
+  return c.json({ error: 'Failed to fetch detail' }, 502)
 })
 
 export default app

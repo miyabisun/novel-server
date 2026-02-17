@@ -44,17 +44,21 @@ app.get('/api/novel/:type/:id/pages/:num', async (c) => {
   if (!VALID_TYPES.includes(type)) return c.json({ error: 'Invalid type' }, 400)
   const key = `novel:${type}:${id}:page:${num}`
 
-  let html = cache.get(key) as string | null
-  if (!html) {
+  const cached = cache.get(key) as string | null
+  if (cached !== null) return c.json({ html: cached })
+
+  for (let i = 0; i < 3; i++) {
     try {
       const raw = await M[type].fetchPage(id, num)
-      html = sanitizeHtml(raw)
+      const html = sanitizeHtml(raw)
       cache.set(key, html, PAGE_TTL)
-    } catch {
-      return c.json({ error: 'Failed to fetch page' }, 502)
+      return c.json({ html })
+    } catch (e) {
+      console.error(`fetchPage ${type}/${id}/${num} attempt ${i + 1} failed:`, e)
+      if (i < 2) await new Promise(r => setTimeout(r, 500 * (i + 1)))
     }
   }
-  return c.json({ html })
+  return c.json({ error: 'Failed to fetch page' }, 502)
 })
 
 app.patch('/api/novel/:type/:id/pages/:num', async (c) => {
@@ -62,14 +66,18 @@ app.patch('/api/novel/:type/:id/pages/:num', async (c) => {
   if (!VALID_TYPES.includes(type)) return c.json({ error: 'Invalid type' }, 400)
   const key = `novel:${type}:${id}:page:${num}`
 
-  try {
-    const raw = await M[type].fetchPage(id, num)
-    const html = sanitizeHtml(raw)
-    cache.set(key, html, PAGE_TTL)
-    return c.json({ html })
-  } catch {
-    return c.json({ error: 'Failed to fetch page' }, 502)
+  for (let i = 0; i < 3; i++) {
+    try {
+      const raw = await M[type].fetchPage(id, num)
+      const html = sanitizeHtml(raw)
+      cache.set(key, html, PAGE_TTL)
+      return c.json({ html })
+    } catch (e) {
+      console.error(`fetchPage PATCH ${type}/${id}/${num} attempt ${i + 1} failed:`, e)
+      if (i < 2) await new Promise(r => setTimeout(r, 500 * (i + 1)))
+    }
   }
+  return c.json({ error: 'Failed to fetch page' }, 502)
 })
 
 export default app

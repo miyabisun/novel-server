@@ -51,6 +51,8 @@ header
 	padding: 10px 12px 10px 0
 	margin-right: 4px
 	border-right: 1px solid #444
+	user-select: none
+	pointer-events: none
 
 	@media (max-width: 799px)
 		display: none

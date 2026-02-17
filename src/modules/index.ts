@@ -5,7 +5,7 @@ import nocturne from './nocturne.js'
 interface NovelModule {
   fetchRankingList(limit?: number, period?: string): Promise<Record<string, Record<string, unknown>[]>>
   fetchPage(id: string, pageId: string | number): Promise<string | null>
-  fetchDetail(id: string): Promise<{ title: string; synopsis: string }>
+  fetchDetail(id: string): Promise<{ title: string; synopsis: string; page: number }>
 }
 
 const modules: Record<string, NovelModule> = {

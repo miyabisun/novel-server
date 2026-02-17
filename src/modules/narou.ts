@@ -41,9 +41,9 @@ const narou = {
   },
 
   async fetchDetail(id: string) {
-    const data = await fetchApi({ of: 't-s', ncode: id })
+    const data = await fetchApi({ of: 't-s-ga', ncode: id })
     if (!data[0]) throw new Error('Novel not found')
-    return { title: data[0].title as string, synopsis: (data[0].story as string) ?? '' }
+    return { title: data[0].title as string, synopsis: (data[0].story as string) ?? '', page: (data[0].page as number) ?? 0 }
   },
 
   async fetchPage(ncode: string, page: string | number) {

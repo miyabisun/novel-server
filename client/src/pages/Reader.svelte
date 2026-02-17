@@ -8,7 +8,20 @@
 	let loading = $state(false);
 	let error = $state(null);
 	let title = $state('');
+	let totalPages = $state(0);
+	let isFav = $state(false);
+	let favSaving = $state(false);
 	let currentNum = $derived(Number(params.num));
+	let headerHeight = $state(0);
+
+	$effect(() => {
+		const header = document.querySelector('header');
+		if (!header) return;
+		headerHeight = header.offsetHeight;
+		const ro = new ResizeObserver(() => { headerHeight = header.offsetHeight; });
+		ro.observe(header);
+		return () => ro.disconnect();
+	});
 
 	async function loadPage(type, id, num) {
 		loading = true;
@@ -31,10 +44,10 @@
 	}
 
 	function handleKeydown(e) {
-		if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+		if (e.key === 'ArrowLeft') {
 			e.preventDefault();
 			goTo(currentNum - 1);
-		} else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+		} else if (e.key === 'ArrowRight') {
 			e.preventDefault();
 			goTo(currentNum + 1);
 		} else if (e.key === 'Backspace') {
@@ -55,11 +68,41 @@
 		try {
 			const data = await fetcher(`${config.path.api}/novel/${type}/${id}/detail`);
 			title = data.title || '';
+			totalPages = data.page || 0;
 		} catch (e) { console.warn('loadDetail failed:', e) }
+	}
+
+	async function loadFavStatus(type, id) {
+		try {
+			const favorites = await fetcher(`${config.path.api}/favorites`);
+			isFav = favorites.some((f) => f.type === type && f.id === id);
+		} catch { isFav = false; }
+	}
+
+	async function toggleFavorite() {
+		if (favSaving) return;
+		favSaving = true;
+		try {
+			if (isFav) {
+				await fetcher(`${config.path.api}/favorites/${params.type}/${params.id}`, { method: 'DELETE' });
+			} else {
+				await fetcher(`${config.path.api}/favorites/${params.type}/${params.id}`, {
+					method: 'PUT',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ title, page: totalPages }),
+				});
+			}
+			isFav = !isFav;
+		} catch (err) {
+			alert(err.message);
+		} finally {
+			favSaving = false;
+		}
 	}
 
 	$effect(() => {
 		loadDetail(params.type, params.id);
+		loadFavStatus(params.type, params.id);
 	});
 
 	$effect(() => {
@@ -73,30 +116,29 @@
 	});
 </script>
 
-<div class="reader">
-	<nav class="nav">
-		<button onclick={() => navigate('/')}>← ランキングへ</button>
-		<span class="page-info">{title || params.id} / {currentNum}話</span>
-		<div class="page-controls">
-			<button onclick={() => goTo(currentNum - 1)} disabled={currentNum <= 1}>← 前</button>
-			<button onclick={() => goTo(currentNum + 1)}>次 →</button>
-		</div>
-	</nav>
+<nav class="reader-bar top" style="top: {headerHeight}px">
+	<div class="bar-title">{title || params.id}</div>
+	<div class="bar-right">
+		<span class="bar-page">{currentNum}{#if totalPages}/{totalPages}{/if}</span>
+		<button class="nav-btn" onclick={() => goTo(currentNum - 1)} disabled={currentNum <= 1}>前</button>
+		<button class="nav-btn" onclick={() => goTo(currentNum + 1)}>次</button>
+		<button class="fav-btn" onclick={toggleFavorite} disabled={favSaving || !title}>
+			{isFav ? '★' : '☆'}
+		</button>
+	</div>
+</nav>
 
+<div class="reader">
 	{#if loading}
 		<p class="status">読み込み中...</p>
 	{:else if error}
 		<p class="status error">{error}</p>
+		<p class="status"><button class="nav-btn" onclick={() => loadPage(params.type, params.id, params.num)}>再読み込み</button></p>
 	{:else}
 		<article class="content">
 			{@html html}
 		</article>
 	{/if}
-
-	<nav class="nav bottom">
-		<button onclick={() => goTo(currentNum - 1)} disabled={currentNum <= 1}>← 前のページ</button>
-		<button onclick={() => goTo(currentNum + 1)}>次のページ →</button>
-	</nav>
 </div>
 
 <style lang="sass">
@@ -105,38 +147,49 @@
 	max-width: 800px
 	margin: 0 auto
 
-.nav
+.reader-bar
 	display: flex
 	align-items: center
 	justify-content: space-between
-	padding: 8px 0
-	border-bottom: 1px solid #555
-	flex-wrap: wrap
+	padding: 8px 2.5%
+	background: #2a2a2a
+	border-bottom: 1px solid #444
 	gap: 8px
+	z-index: 50
 
-	&.bottom
-		border-bottom: none
-		border-top: 1px solid #555
-		justify-content: center
-		gap: 16px
-		margin-top: 24px
-		padding-top: 16px
+	&.top
+		position: sticky
+		margin-top: -16px
 
-.page-info
-	color: rgba(255, 255, 255, 0.6)
-	font-size: 0.9rem
+.bar-title
+	color: rgba(255, 255, 255, 0.75)
+	font-size: 0.85rem
+	white-space: nowrap
+	overflow: hidden
+	text-overflow: ellipsis
+	min-width: 0
+	flex: 1
 
-.page-controls
+.bar-right
 	display: flex
+	align-items: center
 	gap: 4px
+	flex-shrink: 0
 
-button
-	padding: 4px 12px
+.bar-page
+	color: rgba(255, 255, 255, 0.5)
+	font-size: 0.8rem
+	margin-right: 4px
+	white-space: nowrap
+
+.nav-btn
+	padding: 4px 14px
 	border: 1px solid #555
 	background: transparent
 	color: rgba(255, 255, 255, 0.7)
 	cursor: pointer
 	border-radius: 4px
+	font-size: 0.85rem
 
 	&:hover:not(:disabled)
 		background: rgba(255, 255, 255, 0.1)
@@ -144,6 +197,22 @@ button
 	&:disabled
 		opacity: 0.3
 		cursor: not-allowed
+
+.fav-btn
+	padding: 4px 10px
+	border: 1px solid rgba(255, 200, 50, 0.3)
+	background: transparent
+	color: rgba(255, 200, 50, 0.8)
+	cursor: pointer
+	border-radius: 4px
+	font-size: 1rem
+
+	&:hover:not(:disabled)
+		background: rgba(255, 200, 50, 0.1)
+
+	&:disabled
+		cursor: default
+		opacity: 0.7
 
 .status
 	text-align: center
@@ -163,4 +232,5 @@ button
 
 	:global(br)
 		line-height: 2
+
 </style>

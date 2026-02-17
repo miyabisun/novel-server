@@ -75,7 +75,8 @@ const kakuyomu = {
   async fetchDetail(id: string) {
     const apollo = await kakuyomu.fetchWork(id)
     const work = extractWork(apollo, id)
-    return { title: work.title, synopsis: work.story }
+    const episodes = extractEpisodes(apollo, id)
+    return { title: work.title, synopsis: work.story, page: episodes.length }
   },
 
   async fetchDatum(id: string) {
