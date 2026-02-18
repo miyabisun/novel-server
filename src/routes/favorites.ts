@@ -31,6 +31,25 @@ app.put('/api/favorites/:type/:id', async (c) => {
     })
     .returning()
     .get()
+
+  // Fire-and-forget: fetch metadata immediately after adding
+  M[type].fetchDatum(id).then((datum) => {
+    const title = datum.title as string | undefined
+    const page = (datum.pages as unknown[])?.length as number | undefined
+    const novelupdated_at = datum.novelupdated_at as string | undefined
+    db.update(favorites)
+      .set({
+        ...(title != null && { title }),
+        ...(page != null && { page }),
+        ...(novelupdated_at != null && { novelupdated_at }),
+      })
+      .where(and(eq(favorites.type, type), eq(favorites.id, id)))
+      .run()
+    console.log(`[sync] initial fetch for ${type}/${id}`)
+  }).catch((e) => {
+    console.error(`[sync] initial fetch failed for ${type}/${id}:`, e)
+  })
+
   return c.json(favorite)
 })
 
