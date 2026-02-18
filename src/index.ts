@@ -3,6 +3,7 @@ import { serveStatic } from '@hono/node-server/serve-static'
 import { Hono } from 'hono'
 import { logger } from 'hono/logger'
 
+import init from './lib/init.js'
 import ranking from './routes/ranking.js'
 import pages from './routes/pages.js'
 import detail from './routes/detail.js'
@@ -44,6 +45,8 @@ if (basePath) {
 } else {
   app.route('/', sub)
 }
+
+await init()
 
 console.log(`Server running on http://localhost:${port}${basePath || '/'}`)
 serve({ fetch: app.fetch, port })

@@ -8,7 +8,10 @@ novel-server/
 │   ├── index.ts                # エントリポイント、ミドルウェア設定
 │   ├── lib/
 │   │   ├── cache.ts            # インメモリキャッシュ（Map + TTL）
-│   │   └── prisma.ts           # PrismaClient シングルトン
+│   │   ├── config.ts           # DATABASE_PATH → DATABASE_URL 変換
+│   │   ├── init.ts             # 起動時スキーマ初期化（CREATE IF NOT EXISTS）
+│   │   ├── prisma.ts           # PrismaClient シングルトン
+│   │   └── spa.ts              # SPA 用 index.html 配信
 │   ├── modules/
 │   │   ├── index.ts            # モジュール集約
 │   │   ├── narou.ts            # なろうスクレイピング
@@ -37,7 +40,8 @@ novel-server/
 │   └── build/                  # ビルド出力（git 管理外）
 ├── prisma/
 │   └── schema.prisma           # DB スキーマ定義
-├── .env                        # 環境変数
+├── Dockerfile                  # マルチステージビルド
+├── .env                        # 環境変数（DATABASE_PATH, PORT, BASE_PATH）
 └── package.json
 ```
 
@@ -75,7 +79,9 @@ novel-server/
 
 ### データベース
 
-SQLite + Prisma を使用。テーブルは 2 つ:
+SQLite + Prisma を使用。起動時に `init.ts` が `CREATE TABLE IF NOT EXISTS` でスキーマを自動作成するため、`prisma db push` は不要です。
+
+DB パスは環境変数 `DATABASE_PATH` で指定します（デフォルト: `/data/novel.db`）。`config.ts` が Prisma 用の `DATABASE_URL` に変換します。
 
 **favorites** — お気に入り管理
 
@@ -87,16 +93,6 @@ SQLite + Prisma を使用。テーブルは 2 つ:
 | `novelupdated_at` | TEXT? | 小説の更新日時 |
 | `page` | INTEGER | 総ページ数 |
 | `read` | INTEGER | 既読ページ番号 |
-
-**pages** — ページ ID のマッピング（スクレイピング補助）
-
-| カラム | 型 | 説明 |
-|--------|-----|------|
-| `type` | TEXT (PK) | サイト種別 |
-| `id` | TEXT (PK) | 小説 ID |
-| `num` | INTEGER (PK) | ページ番号 |
-| `page_id` | TEXT | サイト固有のページ ID |
-| `title` | TEXT | ページタイトル |
 
 ## フロントエンド
 

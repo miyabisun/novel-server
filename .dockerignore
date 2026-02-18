@@ -1,0 +1,8 @@
+node_modules
+client/node_modules
+client/build
+**/*.db
+*.md
+**/*.test.ts
+.git
+.env
