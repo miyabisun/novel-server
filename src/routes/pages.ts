@@ -20,22 +20,23 @@ const ALLOWED_TAGS = new Set([
 function sanitizeHtml(html: string | null): string {
   if (!html) return ''
   const $ = cheerio.load(html, { xml: false })
-  // Repeat until no disallowed tags remain (handles nested unwrapping)
-  let dirty = true
-  while (dirty) {
-    dirty = false
-    $('*').each((_i, el) => {
-      if (el.type !== 'tag') return
-      if (!ALLOWED_TAGS.has(el.tagName)) {
-        $(el).replaceWith($(el).contents())
-        dirty = true
+
+  function walk(nodes: cheerio.Cheerio<cheerio.AnyNode>) {
+    nodes.contents().each((_i, node) => {
+      if (node.type !== 'tag') return
+      const $el = $(node)
+      walk($el) // children first (bottom-up)
+      if (!ALLOWED_TAGS.has(node.tagName)) {
+        $el.replaceWith($el.contents())
       } else {
-        for (const attr of Object.keys(el.attribs)) {
-          $(el).removeAttr(attr)
+        for (const attr of Object.keys(node.attribs)) {
+          $el.removeAttr(attr)
         }
       }
     })
   }
+
+  walk($.root())
   return $('body').html() ?? ''
 }
 
