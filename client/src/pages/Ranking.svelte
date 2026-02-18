@@ -1,8 +1,9 @@
 <script>
 	import config from '$lib/config.js';
 	import fetcher from '$lib/fetcher.js';
-	import { navigate } from '$lib/router.svelte.js';
+	import { link } from '$lib/router.svelte.js';
 	import NovelDetailModal from '$lib/components/NovelDetailModal.svelte';
+	import { decodeHtml } from '$lib/decode.js';
 
 	let { type } = $props();
 
@@ -34,7 +35,7 @@
 			ranking = rankingData;
 			favIds = new Set(favorites.filter((f) => f.type === t).map((f) => f.id));
 			const keys = Object.keys(ranking);
-			activeGenre = keys.length > 1 ? keys[0] : null;
+			activeGenre = keys.length > 1 ? (keys.includes(activeGenre) ? activeGenre : keys[0]) : null;
 		} catch (e) {
 			error = e.message;
 			ranking = null;
@@ -46,10 +47,6 @@
 	function selectPeriod(period) {
 		activePeriod = period;
 		loadRanking(type, period);
-	}
-
-	function goToReader(id, num = 1) {
-		navigate(`/novel/${type}/${id}/${num}`);
 	}
 
 	function updateFavIds(id) {
@@ -113,29 +110,23 @@
 	{:else if ranking}
 		{@const visibleGenres = activeGenre ? [[activeGenre, ranking[activeGenre] ?? []]] : Object.entries(ranking)}
 		{#each visibleGenres as [genre, novels]}
-			<table>
-				<thead>
-					<tr>
-						<th class="col-rank">#</th>
-						<th class="col-title">タイトル</th>
-						<th class="col-page">話数</th>
-						<th class="col-actions"></th>
-					</tr>
-				</thead>
-				<tbody>
-					{#each novels as novel, i}
-						<tr onclick={() => selectedNovel = novel} class="clickable">
-							<td class="col-rank">{i + 1}</td>
-							<td class="col-title">{novel.title}</td>
-							<td class="col-page" class:tanpen={novel.noveltype === 2}>{novel.noveltype === 2 ? '短編' : novel.page}</td>
-							<td class="col-actions">
-								<button class="read-btn" onclick={(e) => { e.stopPropagation(); goToReader(novel.id); }}>📘</button>
-								<button class="fav-btn" onclick={(e) => toggleFavorite(e, novel)}>{favIds.has(novel.id) ? '★' : '☆'}</button>
-							</td>
-						</tr>
-					{/each}
-				</tbody>
-			</table>
+			<div class="novel-grid">
+				{#each novels as novel, i}
+					<a href={link(`/novel/${type}/${novel.id}/1`)} class="novel-card">
+						<div class="card-body">
+							<div class="card-header">
+								<span class="card-rank">{i + 1}位</span>
+								<span class="card-page" class:tanpen={novel.noveltype === 2}>{novel.noveltype === 2 ? '短編' : `${novel.page}話`}</span>
+							</div>
+							<div class="card-title">{decodeHtml(novel.title)}</div>
+						</div>
+						<div class="card-actions">
+							<button class="detail-btn" onclick={(e) => { e.preventDefault(); e.stopPropagation(); selectedNovel = novel; }}>📖</button>
+							<button class="fav-btn" onclick={(e) => { e.preventDefault(); toggleFavorite(e, novel); }}>{favIds.has(novel.id) ? '★' : '☆'}</button>
+						</div>
+					</a>
+				{/each}
+			</div>
 		{/each}
 	{/if}
 </div>
@@ -152,7 +143,7 @@
 
 <style lang="sass">
 .ranking
-	padding: 0 15px
+	padding: 12px 15px 0
 
 .toolbar
 	display: flex
@@ -214,142 +205,94 @@
 		color: white
 		border-color: rgba(128, 192, 255, 0.5)
 
-.col-actions
-	width: 70px
-	text-align: right
-	white-space: nowrap
+.novel-grid
+	display: flex
+	flex-direction: column
+	gap: 8px
 
-.read-btn
-	padding: 2px 8px
-	border: 1px solid rgba(128, 192, 255, 0.4)
+.novel-card
+	display: flex
+	border: 1px solid #444
+	border-radius: 6px
+	text-decoration: none
+	color: inherit
+
+	&:hover
+		background-color: rgba(255, 255, 255, 0.08)
+
+.card-body
+	flex: 1
+	min-width: 0
+	display: flex
+	flex-direction: column
+	gap: 4px
+	padding: 8px
+
+.card-header
+	display: flex
+	align-items: center
+	gap: 8px
+
+.card-rank
+	font-size: 0.8rem
+	font-weight: bold
+	color: rgba(255, 255, 255, 0.5)
+
+.card-page
+	font-size: 0.8rem
+	color: rgba(255, 255, 255, 0.5)
+
+	&.tanpen
+		color: rgba(255, 255, 255, 0.4)
+
+.card-title
+	line-height: 1.4
+
+.card-actions
+	display: flex
+	flex-direction: column
+	flex-shrink: 0
+	width: 40px
+	border-left: 1px solid #444
+
+.detail-btn, .fav-btn
+	flex: 1
+	width: 100%
+	border: none
+	border-radius: 0
 	background: transparent
 	cursor: pointer
-	border-radius: 3px
-	font-size: 0.8rem
+	display: flex
+	align-items: center
+	justify-content: center
+	font-size: 0.9rem
+
+.detail-btn
+	border-bottom: 1px solid #444
+	border-radius: 0 6px 0 0
 
 	&:hover
 		background: rgba(128, 192, 255, 0.15)
 
 .fav-btn
-	padding: 2px 6px
-	border: 1px solid rgba(255, 200, 50, 0.3)
-	background: transparent
+	border-radius: 0 0 6px 0
 	color: rgba(255, 200, 50, 0.8)
-	cursor: pointer
-	border-radius: 3px
-	font-size: 0.95rem
 
 	&:hover
 		background: rgba(255, 200, 50, 0.1)
 		color: rgba(255, 200, 50, 1)
 
-.col-rank
-	width: 40px
-	text-align: center
-
-.col-title
-	text-align: left
-
-.col-page
-	width: 60px
-	text-align: right
-
-.clickable
-	cursor: pointer
-
-// Desktop: sticky toolbar + thead
+// Desktop
 @media (min-width: 800px)
 	.toolbar
 		position: sticky
-		top: 42px
+		top: 0
 		background: #222
 		z-index: 50
+		padding-top: 12px
 		padding-bottom: 12px
 		margin-bottom: 0
 
-	table :global(thead th)
-		position: sticky
-		top: 76px
-		background: #222
-		z-index: 40
-		box-shadow: 0 -8px 0 #222
-
-// Mobile: card layout
-@media (max-width: 799px)
-	table
-		display: block
-
-	table :global(thead)
-		display: none
-
-	table :global(tbody)
-		display: flex
-		flex-direction: column
-		gap: 8px
-
-	table :global(tr)
-		display: flex
-		flex-wrap: wrap
-		align-items: center
-		gap: 4px 8px
-		padding: 8px 40px 8px 8px
-		border: 1px solid #444
-		border-radius: 6px
-		position: relative
-
-	table :global(td)
-		padding: 0
-
-	table :global(.col-actions)
-		position: absolute
-		right: 0
-		top: 0
-		bottom: 0
-		width: 40px
-		display: flex
-		flex-direction: column
-		gap: 0
-		border-left: 1px solid #444
-
-	table :global(.col-actions .read-btn),
-	table :global(.col-actions .fav-btn)
-		flex: 1
-		width: 100%
-		border: none
-		border-radius: 0
-		display: flex
-		align-items: center
-		justify-content: center
-
-	table :global(.col-actions .read-btn)
-		border-bottom: 1px solid #444
-		border-radius: 0 6px 0 0
-
-	table :global(.col-actions .fav-btn)
-		border-radius: 0 0 6px 0
-
-	table :global(.col-rank)
-		width: auto
-		font-weight: bold
-		&::after
-			content: "位"
-
-	table :global(.col-title)
-		width: 100%
-		order: 2
-
-	table :global(.col-page)
-		width: auto
-		margin-left: auto
-		padding-right: 10px
-		font-size: 0.8rem
-		color: rgba(255, 255, 255, 0.5)
-		&::before
-			content: "全"
-		&::after
-			content: "話"
-
-	table :global(.col-page.tanpen)
-		&::before, &::after
-			content: none
+	.card-title
+		font-size: 1rem
 </style>

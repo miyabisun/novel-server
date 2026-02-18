@@ -28,11 +28,25 @@
 	});
 </script>
 
-<Header />
-{#if router.index === 0}
-	<Favorites />
-{:else if router.index === 1}
-	<Ranking type={router.params.type} />
-{:else if router.index === 2}
-	<Reader params={router.params} />
-{/if}
+<div class="app">
+	<Header />
+	<main>
+		{#if router.index === 0}
+			<Favorites />
+		{:else if router.index === 1}
+			<Ranking type={router.params.type} />
+		{:else if router.index === 2}
+			<Reader params={router.params} />
+		{/if}
+	</main>
+</div>
+
+<style lang="sass">
+.app
+	display: grid
+	grid-template-rows: auto 1fr
+	height: 100dvh
+
+main
+	overflow-y: auto
+</style>

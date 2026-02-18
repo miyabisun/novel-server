@@ -24,7 +24,7 @@ async function handleNotFound<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 app.get('/api/favorites', async (c) => {
-  const favorites = await prisma.favorite.findMany({ orderBy: { title: 'asc' } })
+  const favorites = await prisma.favorite.findMany({ orderBy: { novelupdated_at: { sort: 'desc', nulls: 'last' } } })
   return c.json(favorites)
 })
 

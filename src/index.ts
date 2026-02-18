@@ -4,6 +4,7 @@ import { Hono } from 'hono'
 import { logger } from 'hono/logger'
 
 import init from './lib/init.js'
+import { startSync } from './lib/favorite-sync.js'
 import ranking from './routes/ranking.js'
 import pages from './routes/pages.js'
 import detail from './routes/detail.js'
@@ -47,6 +48,7 @@ if (basePath) {
 }
 
 await init()
+startSync()
 
 console.log(`Server running on http://localhost:${port}${basePath || '/'}`)
 serve({ fetch: app.fetch, port })

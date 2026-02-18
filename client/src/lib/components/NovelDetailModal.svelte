@@ -2,6 +2,7 @@
 	import config from '$lib/config.js';
 	import fetcher from '$lib/fetcher.js';
 	import { navigate } from '$lib/router.svelte.js';
+	import { decodeHtml } from '$lib/decode.js';
 
 	let { type, novel, isFav = false, onToggleFav, onclose } = $props();
 
@@ -67,7 +68,7 @@
 <div class="backdrop" onclick={handleBackdrop}>
 	<div class="modal">
 		<button class="close-btn" onclick={onclose}>&times;</button>
-		<h2 class="title">{novel.title}</h2>
+		<h2 class="title">{decodeHtml(novel.title)}</h2>
 
 		{#if loading}
 			<p class="status">読み込み中...</p>

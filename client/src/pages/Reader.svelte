@@ -2,6 +2,7 @@
 	import config from '$lib/config.js';
 	import fetcher from '$lib/fetcher.js';
 	import { navigate } from '$lib/router.svelte.js';
+	import { decodeHtml } from '$lib/decode.js';
 
 	let { params } = $props();
 	let html = $state('');
@@ -12,16 +13,6 @@
 	let isFav = $state(false);
 	let favSaving = $state(false);
 	let currentNum = $derived(Number(params.num));
-	let headerHeight = $state(0);
-
-	$effect(() => {
-		const header = document.querySelector('header');
-		if (!header) return;
-		headerHeight = header.offsetHeight;
-		const ro = new ResizeObserver(() => { headerHeight = header.offsetHeight; });
-		ro.observe(header);
-		return () => ro.disconnect();
-	});
 
 	async function loadPage(type, id, num) {
 		loading = true;
@@ -67,7 +58,7 @@
 	async function loadDetail(type, id) {
 		try {
 			const data = await fetcher(`${config.path.api}/novel/${type}/${id}/detail`);
-			title = data.title || '';
+			title = decodeHtml(data.title || '');
 			totalPages = data.page || 0;
 		} catch (e) { console.warn('loadDetail failed:', e) }
 	}
@@ -101,13 +92,20 @@
 	}
 
 	$effect(() => {
+		document.title = title
+			? `${currentNum}話 ${title} | novel-server`
+			: 'novel-server';
+		return () => { document.title = 'novel-server'; };
+	});
+
+	$effect(() => {
 		loadDetail(params.type, params.id);
 		loadFavStatus(params.type, params.id);
 	});
 
 	$effect(() => {
 		loadPage(params.type, params.id, params.num);
-		window.scrollTo(0, 0);
+		document.querySelector('main')?.scrollTo(0, 0);
 	});
 
 	$effect(() => {
@@ -116,7 +114,7 @@
 	});
 </script>
 
-<nav class="reader-bar top" style="top: {headerHeight}px">
+<nav class="reader-bar top">
 	<div class="bar-title">{title || params.id}</div>
 	<div class="bar-right">
 		<span class="bar-page">{currentNum}{#if totalPages}/{totalPages}{/if}</span>
@@ -159,7 +157,7 @@
 
 	&.top
 		position: sticky
-		margin-top: -16px
+		top: 0
 
 .bar-title
 	color: rgba(255, 255, 255, 0.75)

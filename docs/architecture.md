@@ -9,6 +9,7 @@ novel-server/
 │   ├── lib/
 │   │   ├── cache.ts            # インメモリキャッシュ（Map + TTL）
 │   │   ├── config.ts           # DATABASE_PATH → DATABASE_URL 変換
+│   │   ├── favorite-sync.ts     # お気に入りバックグラウンド同期
 │   │   ├── init.ts             # 起動時スキーマ初期化（CREATE IF NOT EXISTS）
 │   │   ├── prisma.ts           # PrismaClient シングルトン
 │   │   └── spa.ts              # SPA 用 index.html 配信
@@ -28,6 +29,7 @@ novel-server/
 │   │   ├── main.js             # エントリポイント
 │   │   ├── lib/
 │   │   │   ├── config.js       # API パス設定
+│   │   │   ├── decode.js       # HTML エンティティデコード
 │   │   │   ├── fetcher.js      # fetch ラッパー
 │   │   │   ├── router.svelte.js # SPA ルーター
 │   │   │   └── components/
@@ -64,6 +66,8 @@ novel-server/
 - `fetchRankingList(limit?, period?)` — ランキングデータを取得してジャンル別にグループ化（period: `daily` / `weekly` / `monthly` / `quarter` / `yearly`）
 - `fetchDetail(id)` — 小説のタイトル・あらすじ・総ページ数を取得
 - `fetchPage(id, num)` — 小説の本文 HTML を取得
+- `fetchData(ids)` — 複数小説のメタデータを一括取得（同期用）
+- `fetchDatum(id)` — 単一小説のメタデータを取得（同期用）
 
 ### キャッシュ戦略
 
@@ -76,6 +80,15 @@ novel-server/
 | ページ本文 | 24 時間 | 小説の本文は基本的に変わらない |
 
 キャッシュの強制更新は各エンドポイントの `PATCH` メソッドで行えます。
+
+### バックグラウンド同期
+
+`src/lib/favorite-sync.ts` がお気に入りに登録された小説のメタデータ（タイトル・ページ数・更新日時）を定期的に同期します。
+
+| サイト | 方式 | 間隔 |
+|--------|------|------|
+| narou / nocturne | `fetchData` で全件一括取得 | 10 分 |
+| kakuyomu | `fetchDatum` で 1 件ずつラウンドロビン | 1 時間で全件を巡回 |
 
 ### データベース
 

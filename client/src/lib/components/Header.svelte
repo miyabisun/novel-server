@@ -34,11 +34,7 @@ header
 	align-items: center
 	justify-content: space-between
 	border-bottom: 1px solid #444
-	margin-bottom: 16px
-	position: sticky
-	top: 0
 	background: #222
-	z-index: 100
 
 .nav-left
 	display: flex
