@@ -13,4 +13,8 @@ export default function init() {
       PRIMARY KEY (type, id)
     )
   `)
+  db.run(sql`
+    CREATE INDEX IF NOT EXISTS idx_favorites_updated
+    ON favorites (novelupdated_at DESC)
+  `)
 }
