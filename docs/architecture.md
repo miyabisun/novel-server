@@ -69,6 +69,12 @@ novel-server/
 - `fetchData(ids)` — 複数小説のメタデータを一括取得（同期用）
 - `fetchDatum(id)` — 単一小説のメタデータを取得（同期用）
 
+### HTML サニタイズ
+
+`src/routes/pages.ts` では、スクレイピングモジュールが返す本文 HTML をサニタイズしてからクライアントに返しています。許可タグ以外を除去し、全属性を削除します。
+
+スクレイピングモジュール（`src/modules/`）が HTML パースに cheerio を使用しているのに対し、pages.ts では Bun 組み込みの `HTMLRewriter` を使用しています。cheerio は DOM ツリーを構築するため CSS セレクタによる要素抽出に適していますが、サニタイズのように全要素を順次処理する用途ではストリーミングパーサーの `HTMLRewriter` の方がメモリ効率に優れます。
+
 ### キャッシュ戦略
 
 インメモリの Map ベースキャッシュを使用しています（`src/lib/cache.ts`）。

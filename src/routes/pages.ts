@@ -1,5 +1,4 @@
 import { Hono } from 'hono'
-import * as cheerio from 'cheerio'
 import cache from '../lib/cache.js'
 import M from '../modules/index.js'
 
@@ -8,9 +7,7 @@ const app = new Hono()
 const VALID_TYPES = Object.keys(M)
 const PAGE_TTL = 60 * 60 * 24 // 24 hours
 
-// cheerio.load() が生成する構造タグ + コンテンツ許可タグ
 const ALLOWED_TAGS = new Set([
-  'html', 'head', 'body',
   'p', 'br', 'hr', 'div', 'span',
   'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
   'ruby', 'rt', 'rp', 'rb',
@@ -19,25 +16,19 @@ const ALLOWED_TAGS = new Set([
 
 function sanitizeHtml(html: string | null): string {
   if (!html) return ''
-  const $ = cheerio.load(html, { xml: false })
-
-  function walk(nodes: cheerio.Cheerio<cheerio.AnyNode>) {
-    nodes.contents().each((_i, node) => {
-      if (node.type !== 'tag') return
-      const $el = $(node)
-      walk($el) // children first (bottom-up)
-      if (!ALLOWED_TAGS.has(node.tagName)) {
-        $el.replaceWith($el.contents())
-      } else {
-        for (const attr of Object.keys(node.attribs)) {
-          $el.removeAttr(attr)
+  return new HTMLRewriter()
+    .on('*', {
+      element(el) {
+        if (ALLOWED_TAGS.has(el.tagName)) {
+          for (const [name] of el.attributes) {
+            el.removeAttribute(name)
+          }
+        } else {
+          el.removeAndKeepContent()
         }
-      }
+      },
     })
-  }
-
-  walk($.root())
-  return $('body').html() ?? ''
+    .transform(html)
 }
 
 app.get('/api/novel/:type/:id/pages/:num', async (c) => {
