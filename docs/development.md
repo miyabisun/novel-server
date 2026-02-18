@@ -2,19 +2,19 @@
 
 ## 技術スタック
 
-- **バックエンド**: Hono + TypeScript + Prisma (SQLite)
+- **バックエンド**: Bun + Hono + TypeScript + Drizzle ORM (SQLite)
 - **フロントエンド**: Svelte 5 + Vite + Sass
 
 ## セットアップ
 
 ```bash
-npm run setup
+bun run setup
 ```
 
 このコマンドで以下が実行されます:
 
-1. サーバー側の依存関係をインストール (`npm install`)
-2. クライアント側の依存関係をインストール (`cd client && npm install`)
+1. サーバー側の依存関係をインストール (`bun install`)
+2. クライアント側の依存関係をインストール (`cd client && bun install`)
 3. `.env` が存在しなければ `.env.example` からコピー
 
 `.env` を手動で作成する場合は `.env.example` を参考にしてください。
@@ -23,26 +23,26 @@ npm run setup
 
 ```bash
 # 開発（フロントエンドのホットリビルド付き）
-npm run dev
+bun run dev
 
 # 本番
-npm run build
-npm start
+bun run build
+bun start
 ```
 
 `http://localhost:3000` にアクセスするとアプリケーションが表示されます。
 
-> **注意:** `npm run dev` はフロントエンドの自動リビルド (vite --watch) のみ行います。サーバー側のコード (`src/`) を変更した場合は手動で再起動してください。
+> **注意:** `bun run dev` はフロントエンドの自動リビルド (vite --watch) のみ行います。サーバー側のコード (`src/`) を変更した場合は手動で再起動してください。
 
 ## コマンド一覧
 
 | コマンド | 説明 |
 |---------|------|
-| `npm run setup` | 初期セットアップ（依存インストール + .env 生成） |
-| `npm run dev` | 開発サーバー起動（vite watch + node） |
-| `npm run build` | フロントエンドビルド |
-| `npm run build:client` | フロントエンドの依存インストール + ビルド |
-| `npm start` | 本番サーバー起動 |
+| `bun run setup` | 初期セットアップ（依存インストール + .env 生成） |
+| `bun run dev` | 開発サーバー起動（vite watch + bun） |
+| `bun run build` | フロントエンドビルド |
+| `bun run build:client` | フロントエンドの依存インストール + ビルド |
+| `bun start` | 本番サーバー起動 |
 
 ## 環境変数
 

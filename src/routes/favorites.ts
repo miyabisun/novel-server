@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
-import { Prisma } from '@prisma/client'
-import prisma from '../lib/prisma.js'
+import { eq, and, sql } from 'drizzle-orm'
+import { db } from '../db/index.js'
+import { favorites } from '../db/schema.js'
 import M from '../modules/index.js'
 
 const app = new Hono()
@@ -10,22 +11,9 @@ function validateType(type: string): boolean {
   return VALID_TYPES.includes(type)
 }
 
-class NotFoundError extends Error {}
-
-async function handleNotFound<T>(fn: () => Promise<T>): Promise<T> {
-  try {
-    return await fn()
-  } catch (e) {
-    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2025') {
-      throw new NotFoundError()
-    }
-    throw e
-  }
-}
-
 app.get('/api/favorites', async (c) => {
-  const favorites = await prisma.favorite.findMany({ orderBy: { novelupdated_at: { sort: 'desc', nulls: 'last' } } })
-  return c.json(favorites)
+  const rows = db.select().from(favorites).orderBy(sql`novelupdated_at desc nulls last`).all()
+  return c.json(rows)
 })
 
 app.put('/api/favorites/:type/:id', async (c) => {
@@ -35,24 +23,26 @@ app.put('/api/favorites/:type/:id', async (c) => {
   if (!body.title || body.page == null) {
     return c.json({ error: 'title and page are required' }, 400)
   }
-  const favorite = await prisma.favorite.upsert({
-    where: { type_id: { type, id } },
-    update: { title: body.title, page: body.page, novelupdated_at: body.novelupdated_at ?? null },
-    create: { type, id, title: body.title, page: body.page, novelupdated_at: body.novelupdated_at ?? null, read: 0 },
-  })
+  const favorite = db.insert(favorites)
+    .values({ type, id, title: body.title, page: body.page, novelupdated_at: body.novelupdated_at ?? null, read: 0 })
+    .onConflictDoUpdate({
+      target: [favorites.type, favorites.id],
+      set: { title: body.title, page: body.page, novelupdated_at: body.novelupdated_at ?? null },
+    })
+    .returning()
+    .get()
   return c.json(favorite)
 })
 
 app.delete('/api/favorites/:type/:id', async (c) => {
   const { type, id } = c.req.param()
   if (!validateType(type)) return c.json({ error: 'Invalid type' }, 400)
-  try {
-    await handleNotFound(() => prisma.favorite.delete({ where: { type_id: { type, id } } }))
-    return c.json({ ok: true })
-  } catch (e) {
-    if (e instanceof NotFoundError) return c.json({ error: 'Not found' }, 404)
-    throw e
-  }
+  const deleted = db.delete(favorites)
+    .where(and(eq(favorites.type, type), eq(favorites.id, id)))
+    .returning()
+    .get()
+  if (!deleted) return c.json({ error: 'Not found' }, 404)
+  return c.json({ ok: true })
 })
 
 app.patch('/api/favorites/:type/:id/progress', async (c) => {
@@ -60,12 +50,15 @@ app.patch('/api/favorites/:type/:id/progress', async (c) => {
   if (!validateType(type)) return c.json({ error: 'Invalid type' }, 400)
   const body = await c.req.json()
   if (body.read == null) return c.json({ error: 'read is required' }, 400)
-  const existing = await prisma.favorite.findUnique({ where: { type_id: { type, id } } })
+  const existing = db.select().from(favorites)
+    .where(and(eq(favorites.type, type), eq(favorites.id, id)))
+    .get()
   if (!existing) return c.json({ ok: true })
-  const favorite = await prisma.favorite.update({
-    where: { type_id: { type, id } },
-    data: { read: body.read },
-  })
+  const favorite = db.update(favorites)
+    .set({ read: body.read })
+    .where(and(eq(favorites.type, type), eq(favorites.id, id)))
+    .returning()
+    .get()
   return c.json(favorite)
 })
 

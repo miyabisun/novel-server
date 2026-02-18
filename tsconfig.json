@@ -10,7 +10,8 @@
     "rootDir": "src",
     "resolveJsonModule": true,
     "declaration": true,
-    "sourceMap": true
+    "sourceMap": true,
+    "types": ["bun-types"]
   },
   "include": ["src"],
   "exclude": ["node_modules", "dist", "client"]

@@ -1,5 +1,4 @@
-import { serve } from '@hono/node-server'
-import { serveStatic } from '@hono/node-server/serve-static'
+import { serveStatic } from 'hono/bun'
 import { Hono } from 'hono'
 import { logger } from 'hono/logger'
 
@@ -38,7 +37,7 @@ sub.use('/assets/*', serveStatic({
 sub.get('*', (c) => {
   const html = getIndexHtml(basePath)
   if (html) return c.html(html)
-  return c.json({ error: 'Frontend not built. Run: npm run build:client' }, 404)
+  return c.json({ error: 'Frontend not built. Run: bun run build:client' }, 404)
 })
 
 if (basePath) {
@@ -51,4 +50,5 @@ await init()
 startSync()
 
 console.log(`Server running on http://localhost:${port}${basePath || '/'}`)
-serve({ fetch: app.fetch, port })
+
+export default { port, fetch: app.fetch }

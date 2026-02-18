@@ -3,23 +3,21 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "cd client && npx vite build --watch & node --env-file=.env --import tsx src/index.ts",
-    "setup": "npm install && cd client && npm install && test -f .env || cp .env.example .env",
-    "build:client": "cd client && npm install && npm run build",
-    "build": "npm run build:client",
-    "start": "node --env-file=.env --import tsx src/index.ts"
+    "dev": "cd client && bunx vite build --watch & bun --env-file=.env src/index.ts",
+    "setup": "bun install && cd client && bun install && test -f .env || cp .env.example .env",
+    "build:client": "cd client && bun install && bun run build",
+    "build": "bun run build:client",
+    "start": "bun --env-file=.env src/index.ts"
   },
   "dependencies": {
-    "@hono/node-server": "^1.13.8",
-    "@prisma/client": "^6.3.1",
     "cheerio": "^1.0.0",
     "date-fns": "^4.1.0",
-    "hono": "^4.7.2",
-    "tsx": "^4.19.2"
+    "drizzle-orm": "^0.39.0",
+    "hono": "^4.7.2"
   },
   "devDependencies": {
-    "@types/node": "^22.13.1",
-    "prisma": "^6.3.1",
+    "@types/bun": "^1.2.0",
+    "drizzle-kit": "^0.30.0",
     "typescript": "^5.7.3"
   }
 }

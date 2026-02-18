@@ -1,4 +1,6 @@
-import prisma from './prisma.js'
+import { eq, and } from 'drizzle-orm'
+import { db } from '../db/index.js'
+import { favorites } from '../db/schema.js'
 import modules from '../modules/index.js'
 
 function startSyosetuSync(type: string, intervalMs: number) {
@@ -6,31 +8,30 @@ function startSyosetuSync(type: string, intervalMs: number) {
 
   async function sync() {
     try {
-      const favorites = await prisma.favorite.findMany({
-        where: { type },
-        select: { id: true },
-      })
-      if (favorites.length === 0) return
+      const rows = db.select({ id: favorites.id }).from(favorites)
+        .where(eq(favorites.type, type))
+        .all()
+      if (rows.length === 0) return
 
-      const ids = favorites.map((f) => f.id)
+      const ids = rows.map((f) => f.id)
       const data = await mod.fetchData(ids)
 
-      await prisma.$transaction(
-        data.map((datum) => {
+      db.transaction((tx) => {
+        for (const datum of data) {
           const id = datum.id as string
           const title = datum.title as string | undefined
           const page = (datum.pages as unknown[])?.length as number | undefined
           const novelupdated_at = datum.novelupdated_at as string | undefined
-          return prisma.favorite.update({
-            where: { type_id: { type, id } },
-            data: {
+          tx.update(favorites)
+            .set({
               ...(title != null && { title }),
               ...(page != null && { page }),
               ...(novelupdated_at != null && { novelupdated_at }),
-            },
-          })
-        }),
-      )
+            })
+            .where(and(eq(favorites.type, type), eq(favorites.id, id)))
+            .run()
+        }
+      })
       console.log(`[sync] ${type}: updated ${data.length} items`)
     } catch (e) {
       console.error(`[sync] ${type} error:`, e)
@@ -48,31 +49,30 @@ function startKakuyomuSync() {
 
   async function tick() {
     try {
-      const favorites = await prisma.favorite.findMany({
-        where: { type },
-        select: { id: true },
-      })
-      const count = favorites.length
+      const rows = db.select({ id: favorites.id }).from(favorites)
+        .where(eq(favorites.type, type))
+        .all()
+      const count = rows.length
       if (count === 0) {
         setTimeout(tick, 60_000)
         return
       }
 
       index = index % count
-      const { id } = favorites[index]
+      const { id } = rows[index]
       const datum = await mod.fetchDatum(id)
 
       const title = datum.title as string | undefined
       const page = (datum.pages as unknown[])?.length as number | undefined
       const novelupdated_at = datum.novelupdated_at as string | undefined
-      await prisma.favorite.update({
-        where: { type_id: { type, id } },
-        data: {
+      db.update(favorites)
+        .set({
           ...(title != null && { title }),
           ...(page != null && { page }),
           ...(novelupdated_at != null && { novelupdated_at }),
-        },
-      })
+        })
+        .where(and(eq(favorites.type, type), eq(favorites.id, id)))
+        .run()
       console.log(`[sync] kakuyomu: updated ${id} (${index + 1}/${count})`)
 
       index++

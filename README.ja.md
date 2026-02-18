@@ -12,11 +12,11 @@ docker run -p 3000:3000 -v novel-data:/data ghcr.io/miyabisun/novel-server:lates
 
 ブラウザで `http://localhost:3000` を開く。
 
-## Quick Start (Node.js)
+## Quick Start (Bun)
 
 ```bash
-npm run setup && npm run build:client
-npm start
+bun run setup && bun run build:client
+bun start
 ```
 
 ブラウザで `http://localhost:3000` を開く。
