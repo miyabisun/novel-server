@@ -1,5 +1,10 @@
 # Project Rules
 
+## Review
+
+- After updating files, always call `/rev` to get a review before considering the task complete
+- When multiple files are changed, a single review at the end is sufficient
+
 ## Documentation
 
 - Keep `README.md` and `docs/*.md` up to date whenever code changes affect documented behavior, architecture, or setup instructions

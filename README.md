@@ -1,78 +1,48 @@
 # novel-server
 
+> [日本語ドキュメントはこちら](README.ja.md)
+
 A novel ranking viewer & reader supporting Narou, Kakuyomu, and Nocturne.
 Includes favorites management and automatic reading progress tracking.
 
-[日本語](README.ja.md)
-
-## Tech Stack
-
-- **Backend**: Hono + TypeScript + Prisma (SQLite)
-- **Frontend**: Svelte 5 + Vite + Sass
-
-## Setup
-
-Run the following command to install dependencies, generate `.env`, and initialize the database:
+## Quick Start (Docker)
 
 ```bash
-./scripts/install.sh
+docker run -p 3000:3000 -v novel-data:/data ghcr.io/miyabisun/novel-server:latest
 ```
 
-Safe to re-run on an already configured environment.
+Open `http://localhost:3000` in your browser.
 
-### Manual Setup
-
-To run each step individually:
+## Quick Start (Node.js)
 
 ```bash
-npm install                # Server dependencies
-cd client && npm install   # Client dependencies
-npm run init               # Generate .env
-npm run db:push            # Sync Prisma schema to DB
-```
-
-To create `.env` manually, refer to `.env.example`.
-
-## Running
-
-```bash
-# Development (with frontend hot rebuild)
-npm run dev
-
-# Production
-npm run build
+npm run setup && npm run build:client
 npm start
 ```
 
-Open `http://localhost:3000` to access the application.
+Open `http://localhost:3000` in your browser.
+
+> To deploy under a reverse proxy subpath, set the `BASE_PATH` environment variable.
+
+## Configuration
+
+| Variable | Default | Description |
+|---|---|---|
+| `DATABASE_PATH` | `/data/novel.db` | SQLite database file path |
+| `PORT` | `3000` | Server port |
+| `BASE_PATH` | (empty) | Path prefix for reverse proxy deployment (e.g., `/novels`). Runtime only — no rebuild needed. |
+
+The database is automatically created on first startup.
 
 ## Features
 
-- **Rankings** — Browse rankings from Narou / Kakuyomu / Nocturne with period selection and synopsis preview modal
+- **Rankings** — Browse rankings from Narou / Kakuyomu / Nocturne with period selection and synopsis preview
 - **Reader** — Keyboard-navigable (arrow keys) page turning
 - **Favorites** — Add from rankings with ★, manage and remove from list
 - **Reading Progress** — Automatically saved when a page loads in the reader
 
-## Commands
-
-| Command | Description |
-|---------|-------------|
-| `./scripts/install.sh` | Run full initial setup |
-| `npm run dev` | Start dev server (vite watch + node) |
-| `npm run build` | Build frontend |
-| `npm start` | Start production server |
-| `npm run db:push` | Sync Prisma schema to DB |
-| `npm run init` | Generate `.env` |
-
-## Reverse Proxy
-
-Set `BASE_PATH` to serve under a subpath:
-
-```env
-BASE_PATH=/novels
-```
-
 ## Documentation
 
-- [API Reference](docs/api.md)
-- [Architecture](docs/architecture.md)
+- [Development Guide](docs/development.md) — Local setup, build, and project structure
+- [API Reference](docs/api.md) — REST API specification
+- [Architecture](docs/architecture.md) — Backend / frontend architecture overview

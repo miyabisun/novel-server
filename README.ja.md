@@ -1,48 +1,37 @@
 # novel-server
 
-なろう・カクヨム・ノクターンに対応した小説ランキングビューア＆リーダー。
+なろう・カクヨム・ノクターンに対応した小説ランキングビューア＆リーダーです。
+
 お気に入り管理と既読位置の自動記録機能付き。
 
-## 技術スタック
-
-- **バックエンド**: Hono + TypeScript + Prisma (SQLite)
-- **フロントエンド**: Svelte 5 + Vite + Sass
-
-## セットアップ
-
-以下のコマンドで依存関係のインストール、`.env` の生成、データベースの初期化をまとめて行います:
+## Quick Start (Docker)
 
 ```bash
-./scripts/install.sh
+docker run -p 3000:3000 -v novel-data:/data ghcr.io/miyabisun/novel-server:latest
 ```
 
-既にセットアップ済みの環境で再実行しても安全です。
+ブラウザで `http://localhost:3000` を開く。
 
-### 手動セットアップ
-
-個別に実行する場合:
+## Quick Start (Node.js)
 
 ```bash
-npm install                # サーバー側の依存関係
-cd client && npm install   # クライアント側の依存関係
-npm run init               # .env を生成
-npm run db:push            # Prisma スキーマを DB に同期
-```
-
-`.env` を手動で作成する場合は `.env.example` を参考にしてください。
-
-## 起動
-
-```bash
-# 開発（フロントエンドのホットリビルド付き）
-npm run dev
-
-# 本番
-npm run build
+npm run setup && npm run build:client
 npm start
 ```
 
-`http://localhost:3000` にアクセスするとアプリケーションが表示されます。
+ブラウザで `http://localhost:3000` を開く。
+
+> リバースプロキシのサブパス配下にデプロイする場合は `BASE_PATH` 環境変数を設定してください。
+
+## 設定
+
+| 環境変数 | デフォルト | 説明 |
+|---|---|---|
+| `DATABASE_PATH` | `/data/novel.db` | SQLite データベースファイルのパス |
+| `PORT` | `3000` | サーバーのポート番号 |
+| `BASE_PATH` | (なし) | リバースプロキシ配下で使う場合のパス (例: `/novels`)。ランタイム設定のみで再ビルド不要。 |
+
+データベースは初回起動時に自動生成されます。
 
 ## 主な機能
 
@@ -51,26 +40,8 @@ npm start
 - **お気に入り** — ランキングから★で追加、一覧から管理・削除
 - **既読位置記録** — リーダーでページ読み込み成功時に自動で進捗を保存
 
-## コマンド一覧
+## 詳細ドキュメント
 
-| コマンド | 説明 |
-|---------|------|
-| `./scripts/install.sh` | 初期セットアップ一括実行 |
-| `npm run dev` | 開発サーバー起動（vite watch + node） |
-| `npm run build` | フロントエンドビルド |
-| `npm start` | 本番サーバー起動 |
-| `npm run db:push` | Prisma スキーマを DB に同期 |
-| `npm run init` | `.env` を生成 |
-
-## リバースプロキシ配下での運用
-
-`BASE_PATH` を設定するとサブパスで動作します:
-
-```env
-BASE_PATH=/novels
-```
-
-## ドキュメント
-
-- [API リファレンス](docs/api.md)
-- [アーキテクチャ](docs/architecture.md)
+- [開発ガイド](docs/development.md) — ローカルでの開発・ビルド方法
+- [API リファレンス](docs/api.md) — REST API の仕様
+- [アーキテクチャ](docs/architecture.md) — バックエンド / フロントエンドの構成
