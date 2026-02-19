@@ -4,6 +4,12 @@
 	import { link } from '$lib/router.svelte.js';
 	import { decodeHtml } from '$lib/decode.js';
 
+	const typeColors = {
+		narou: 'rgba(100, 190, 120, 0.7)',
+		kakuyomu: 'rgba(100, 160, 220, 0.7)',
+		nocturne: 'rgba(200, 110, 110, 0.7)',
+	};
+
 	let favorites = $state([]);
 	let loading = $state(false);
 	let error = $state(null);
@@ -146,7 +152,7 @@
 						<div class="card-body">
 							<div class="card-header">
 								<span class="card-info">{fav.read} / {fav.page}{#if fav.novelupdated_at} <span class="card-updated">{formatDate(fav.novelupdated_at)}</span>{/if}</span>
-								<span class="card-type">{fav.type}</span>
+								<span class="card-type" style:--type-color={typeColors[fav.type]}>{fav.type}</span>
 							</div>
 							<div class="card-title">{decodeHtml(fav.title)}</div>
 						</div>
@@ -219,14 +225,17 @@
 
 .card-type
 	font-size: 0.7rem
-	color: rgba(255, 255, 255, 0.4)
-	border: 1px solid rgba(255, 255, 255, 0.2)
+	color: var(--type-color, rgba(255, 255, 255, 0.4))
+	border: 1px solid var(--type-color, rgba(255, 255, 255, 0.2))
 	border-radius: 3px
 	padding: 1px 5px
 	flex-shrink: 0
 
 .card-title
 	line-height: 1.4
+
+	@media (min-width: 769px)
+		font-size: 1rem
 
 .card-actions
 	display: flex

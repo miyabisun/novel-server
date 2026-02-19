@@ -12,7 +12,12 @@
 	let totalPages = $state(0);
 	let isFav = $state(false);
 	let favSaving = $state(false);
+	let showUnfavConfirm = $state(false);
+	let swipeDir = $state(null);
+	let swipeReady = $state(false);
 	let currentNum = $derived(Number(params.num));
+	let canGoPrev = $derived(currentNum > 1);
+	let canGoNext = $derived(!totalPages || currentNum < totalPages);
 
 	async function loadPage(type, id, num) {
 		loading = true;
@@ -31,10 +36,15 @@
 
 	function goTo(num) {
 		if (num < 1) return;
+		if (totalPages && num > totalPages) return;
 		navigate(`/novel/${params.type}/${params.id}/${num}`);
 	}
 
 	function handleKeydown(e) {
+		if (showUnfavConfirm) {
+			if (e.key === 'Escape') showUnfavConfirm = false;
+			return;
+		}
 		if (e.key === 'ArrowLeft') {
 			e.preventDefault();
 			goTo(currentNum - 1);
@@ -70,25 +80,47 @@
 		} catch { isFav = false; }
 	}
 
-	async function toggleFavorite() {
+	function handleFavClick() {
+		if (isFav) {
+			showUnfavConfirm = true;
+		} else {
+			addFavorite();
+		}
+	}
+
+	async function addFavorite() {
 		if (favSaving) return;
 		favSaving = true;
 		try {
-			if (isFav) {
-				await fetcher(`${config.path.api}/favorites/${params.type}/${params.id}`, { method: 'DELETE' });
-			} else {
-				await fetcher(`${config.path.api}/favorites/${params.type}/${params.id}`, {
-					method: 'PUT',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ title, page: totalPages }),
-				});
-			}
-			isFav = !isFav;
+			await fetcher(`${config.path.api}/favorites/${params.type}/${params.id}`, {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ title, page: totalPages }),
+			});
+			isFav = true;
 		} catch (err) {
 			alert(err.message);
 		} finally {
 			favSaving = false;
 		}
+	}
+
+	async function executeUnfav() {
+		showUnfavConfirm = false;
+		if (favSaving) return;
+		favSaving = true;
+		try {
+			await fetcher(`${config.path.api}/favorites/${params.type}/${params.id}`, { method: 'DELETE' });
+			isFav = false;
+		} catch (err) {
+			alert(err.message);
+		} finally {
+			favSaving = false;
+		}
+	}
+
+	function handleBackdrop(e) {
+		if (e.target === e.currentTarget) showUnfavConfirm = false;
 	}
 
 	$effect(() => {
@@ -112,19 +144,83 @@
 		window.addEventListener('keydown', handleKeydown);
 		return () => window.removeEventListener('keydown', handleKeydown);
 	});
+
+	$effect(() => {
+		const node = document.querySelector('.reader');
+		if (!node) return;
+
+		let startX, startY, locked, horizontal;
+
+		function onStart(e) {
+			const touch = e.touches[0];
+			startX = touch.clientX;
+			startY = touch.clientY;
+			locked = false;
+			horizontal = false;
+			swipeDir = null;
+			swipeReady = false;
+		}
+
+		function onMove(e) {
+			const touch = e.touches[0];
+			const dx = touch.clientX - startX;
+			const dy = touch.clientY - startY;
+
+			if (!locked) {
+				if (Math.abs(dx) < 5 && Math.abs(dy) < 5) return;
+				locked = true;
+				horizontal = Math.abs(dx) > Math.abs(dy);
+			}
+			if (!horizontal) return;
+			e.preventDefault();
+			const dir = dx < 0 ? 'next' : 'prev';
+			swipeDir = dir;
+			const canSwipe = dir === 'next' ? canGoNext : canGoPrev;
+			swipeReady = canSwipe && Math.abs(dx) >= 50;
+		}
+
+		function onEnd(e) {
+			if (locked && horizontal) {
+				const dx = e.changedTouches[0].clientX - startX;
+				if (dx < -50) goTo(currentNum + 1);
+				else if (dx > 50) goTo(currentNum - 1);
+			}
+			swipeDir = null;
+			swipeReady = false;
+		}
+
+		node.addEventListener('touchstart', onStart, { passive: true });
+		node.addEventListener('touchmove', onMove, { passive: false });
+		node.addEventListener('touchend', onEnd, { passive: true });
+
+		return () => {
+			node.removeEventListener('touchstart', onStart);
+			node.removeEventListener('touchmove', onMove);
+			node.removeEventListener('touchend', onEnd);
+		};
+	});
 </script>
 
 <nav class="reader-bar top">
 	<div class="bar-title">{title || params.id}</div>
 	<div class="bar-right">
 		<span class="bar-page">{currentNum}{#if totalPages}/{totalPages}{/if}</span>
-		<button class="nav-btn" onclick={() => goTo(currentNum - 1)} disabled={currentNum <= 1}>前</button>
-		<button class="nav-btn" onclick={() => goTo(currentNum + 1)}>次</button>
-		<button class="fav-btn" onclick={toggleFavorite} disabled={favSaving || !title}>
-			{isFav ? '★' : '☆'}
-		</button>
+		<button class="nav-btn" onclick={() => goTo(currentNum - 1)} disabled={!canGoPrev}>前</button>
+		<button class="nav-btn" onclick={() => goTo(currentNum + 1)} disabled={!canGoNext}>次</button>
+		{#if isFav}
+			<button class="fav-btn-remove" onclick={handleFavClick} disabled={favSaving || !title}>✕</button>
+		{:else}
+			<button class="fav-btn" onclick={handleFavClick} disabled={favSaving || !title}>☆</button>
+		{/if}
 	</div>
 </nav>
+
+{#if swipeDir === 'prev'}
+	<div class="swipe-hint left" class:ready={swipeReady} class:disabled={!canGoPrev}>{#if canGoPrev}‹ 前へ{:else}<del>‹ 前へ</del>{/if}</div>
+{/if}
+{#if swipeDir === 'next'}
+	<div class="swipe-hint right" class:ready={swipeReady} class:disabled={!canGoNext}>{#if canGoNext}次へ ›{:else}<del>次へ ›</del>{/if}</div>
+{/if}
 
 <div class="reader">
 	{#if loading}
@@ -138,6 +234,20 @@
 		</article>
 	{/if}
 </div>
+
+{#if showUnfavConfirm}
+	<!-- svelte-ignore a11y_click_events_have_key_events -->
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div class="backdrop" onclick={handleBackdrop}>
+		<div class="modal">
+			<p class="modal-message">「{title}」をお気に入りから削除しますか？</p>
+			<div class="modal-actions">
+				<button class="btn btn-cancel" onclick={() => showUnfavConfirm = false}>キャンセル</button>
+				<button class="btn btn-delete" onclick={executeUnfav}>削除</button>
+			</div>
+		</div>
+	</div>
+{/if}
 
 <style lang="sass">
 .reader
@@ -196,6 +306,10 @@
 		opacity: 0.3
 		cursor: not-allowed
 
+	@media (max-width: 768px)
+		.bar-right > &
+			display: none
+
 .fav-btn
 	padding: 4px 10px
 	border: 1px solid rgba(255, 200, 50, 0.3)
@@ -207,6 +321,22 @@
 
 	&:hover:not(:disabled)
 		background: rgba(255, 200, 50, 0.1)
+
+	&:disabled
+		cursor: default
+		opacity: 0.7
+
+.fav-btn-remove
+	padding: 4px 10px
+	border: 1px solid rgba(255, 100, 100, 0.4)
+	background: transparent
+	color: rgba(255, 100, 100, 0.8)
+	cursor: pointer
+	border-radius: 4px
+	font-size: 1rem
+
+	&:hover:not(:disabled)
+		background: rgba(255, 100, 100, 0.1)
 
 	&:disabled
 		cursor: default
@@ -230,5 +360,83 @@
 
 	:global(br)
 		line-height: 2
+
+.swipe-hint
+	position: fixed
+	top: 50%
+	transform: translateY(-50%)
+	padding: 12px 16px
+	background: rgba(0, 0, 0, 0.7)
+	color: rgba(255, 255, 255, 0.6)
+	font-size: 0.85rem
+	border-radius: 8px
+	z-index: 100
+	pointer-events: none
+	transition: background 0.15s, color 0.15s
+
+	&.left
+		left: 12px
+
+	&.right
+		right: 12px
+
+	&.ready
+		background: rgba(0, 0, 0, 0.85)
+		color: rgba(255, 255, 255, 0.95)
+
+	&.disabled
+		color: rgba(255, 255, 255, 0.55)
+
+.backdrop
+	position: fixed
+	inset: 0
+	background: rgba(0, 0, 0, 0.6)
+	z-index: 200
+	display: flex
+	align-items: center
+	justify-content: center
+	padding: 20px
+
+.modal
+	background: #2a2a2a
+	border: 1px solid #555
+	border-radius: 8px
+	padding: 24px
+	max-width: 360px
+	width: 100%
+
+.modal-message
+	margin: 0 0 20px
+	font-size: 1rem
+	color: rgba(255, 255, 255, 0.9)
+	line-height: 1.6
+	overflow-wrap: break-word
+
+.modal-actions
+	display: flex
+	gap: 8px
+	justify-content: flex-end
+
+.btn
+	padding: 8px 16px
+	border: 1px solid #555
+	border-radius: 4px
+	cursor: pointer
+	font-size: 0.85rem
+
+.btn-cancel
+	background: transparent
+	color: rgba(255, 255, 255, 0.7)
+
+	&:hover
+		background: rgba(255, 255, 255, 0.08)
+
+.btn-delete
+	background: rgba(255, 100, 100, 0.2)
+	color: rgba(255, 100, 100, 0.9)
+	border-color: rgba(255, 100, 100, 0.4)
+
+	&:hover
+		background: rgba(255, 100, 100, 0.3)
 
 </style>
