@@ -144,9 +144,8 @@
 			{#each favorites as fav (fav.type + ':' + fav.id)}
 				<div class="fav-wrapper">
 					<div class="swipe-bg">削除</div>
-					<a
+					<div
 						class="fav-card"
-						href={link(`/novel/${fav.type}/${fav.id}/${fav.read || 1}`)}
 						use:swipeable={{ onConfirmDelete: () => confirmDelete(fav) }}
 					>
 						<div class="card-body">
@@ -154,12 +153,12 @@
 								<span class="card-info">{fav.read} / {fav.page}{#if fav.novelupdated_at} <span class="card-updated">{formatDate(fav.novelupdated_at)}</span>{/if}</span>
 								<span class="card-type" style:--type-color={typeColors[fav.type]}>{fav.type}</span>
 							</div>
-							<div class="card-title">{decodeHtml(fav.title)}</div>
+							<div class="card-title"><a href={link(`/novel/${fav.type}/${fav.id}/${fav.read || 1}`)}>{decodeHtml(fav.title)}</a></div>
 						</div>
 						<div class="card-actions">
-							<button class="delete-btn" onclick={(e) => { e.preventDefault(); e.stopPropagation(); confirmDelete(fav); }}>✕</button>
+							<button class="delete-btn" onclick={() => confirmDelete(fav)}>✕</button>
 						</div>
-					</a>
+					</div>
 				</div>
 			{/each}
 		</div>
@@ -195,7 +194,6 @@
 
 .fav-card
 	display: flex
-	text-decoration: none
 	color: inherit
 
 .fav-wrapper:hover .fav-card
@@ -233,6 +231,13 @@
 
 .card-title
 	line-height: 1.4
+
+	a
+		text-decoration: none
+		color: inherit
+
+		&:hover
+			text-decoration: underline
 
 	@media (min-width: 769px)
 		font-size: 1rem

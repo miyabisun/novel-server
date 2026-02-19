@@ -22,6 +22,7 @@
 	let error = $state(null);
 	let selectedNovel = $state(null);
 	let favIds = $state(new Set());
+	let deleteTarget = $state(null);
 	let genres = $derived(ranking ? Object.keys(ranking) : []);
 
 	async function loadRanking(t, period) {
@@ -54,23 +55,51 @@
 		favIds = new Set(favIds);
 	}
 
-	async function toggleFavorite(e, novel) {
-		e.stopPropagation();
-		const isFav = favIds.has(novel.id);
+	async function addFavorite(novel) {
 		try {
-			if (isFav) {
-				await fetcher(`${config.path.api}/favorites/${type}/${novel.id}`, { method: 'DELETE' });
-			} else {
-				await fetcher(`${config.path.api}/favorites/${type}/${novel.id}`, {
-					method: 'PUT',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ title: novel.title, page: novel.page }),
-				});
-			}
+			await fetcher(`${config.path.api}/favorites/${type}/${novel.id}`, {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ title: novel.title, page: novel.page }),
+			});
 			updateFavIds(novel.id);
 		} catch (err) {
 			alert(err.message);
 		}
+	}
+
+	async function removeFavorite(novel) {
+		try {
+			await fetcher(`${config.path.api}/favorites/${type}/${novel.id}`, { method: 'DELETE' });
+			updateFavIds(novel.id);
+		} catch (err) {
+			alert(err.message);
+		}
+	}
+
+	function confirmDelete(novel) {
+		deleteTarget = novel;
+	}
+
+	function cancelDelete() {
+		deleteTarget = null;
+	}
+
+	async function executeDelete() {
+		if (!deleteTarget) return;
+		try {
+			await removeFavorite(deleteTarget);
+		} finally {
+			cancelDelete();
+		}
+	}
+
+	function handleKeydown(e) {
+		if (deleteTarget && e.key === 'Escape') cancelDelete();
+	}
+
+	function handleBackdrop(e) {
+		if (e.target === e.currentTarget) cancelDelete();
 	}
 
 	$effect(() => {
@@ -78,6 +107,8 @@
 		loadRanking(type, 'daily');
 	});
 </script>
+
+<svelte:window onkeydown={handleKeydown} />
 
 <div class="ranking">
 	<div class="toolbar">
@@ -112,24 +143,42 @@
 		{#each visibleGenres as [genre, novels]}
 			<div class="novel-grid">
 				{#each novels as novel, i}
-					<a href={link(`/novel/${type}/${novel.id}/1`)} class="novel-card">
+					<div class="novel-card">
 						<div class="card-body">
 							<div class="card-header">
 								<span class="card-rank">{i + 1}位</span>
 								<span class="card-page" class:tanpen={novel.noveltype === 2}>{novel.noveltype === 2 ? '短編' : `${novel.page}話`}</span>
 							</div>
-							<div class="card-title">{decodeHtml(novel.title)}</div>
+							<div class="card-title"><a href={link(`/novel/${type}/${novel.id}/1`)}>{decodeHtml(novel.title)}</a></div>
 						</div>
 						<div class="card-actions">
-							<button class="detail-btn" onclick={(e) => { e.preventDefault(); e.stopPropagation(); selectedNovel = novel; }}>📖</button>
-							<button class="fav-btn" onclick={(e) => { e.preventDefault(); toggleFavorite(e, novel); }}>{favIds.has(novel.id) ? '★' : '☆'}</button>
+							<button class="detail-btn" onclick={() => selectedNovel = novel}>📖</button>
+							{#if favIds.has(novel.id)}
+								<button class="unfav-btn" onclick={() => confirmDelete(novel)}>✕</button>
+							{:else}
+								<button class="fav-btn" onclick={() => addFavorite(novel)}>☆</button>
+							{/if}
 						</div>
-					</a>
+					</div>
 				{/each}
 			</div>
 		{/each}
 	{/if}
 </div>
+
+{#if deleteTarget}
+	<!-- svelte-ignore a11y_click_events_have_key_events -->
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div class="backdrop" onclick={handleBackdrop}>
+		<div class="modal">
+			<p class="modal-message">「{decodeHtml(deleteTarget.title)}」をお気に入りから削除しますか？</p>
+			<div class="modal-actions">
+				<button class="btn btn-cancel" onclick={cancelDelete}>キャンセル</button>
+				<button class="btn btn-delete" onclick={executeDelete}>削除</button>
+			</div>
+		</div>
+	</div>
+{/if}
 
 {#if selectedNovel}
 	<NovelDetailModal
@@ -214,8 +263,6 @@
 	display: flex
 	border: 1px solid #444
 	border-radius: 6px
-	text-decoration: none
-	color: inherit
 
 	&:hover
 		background-color: rgba(255, 255, 255, 0.08)
@@ -248,6 +295,13 @@
 .card-title
 	line-height: 1.4
 
+	a
+		text-decoration: none
+		color: inherit
+
+		&:hover
+			text-decoration: underline
+
 .card-actions
 	display: flex
 	flex-direction: column
@@ -255,7 +309,7 @@
 	width: 40px
 	border-left: 1px solid #444
 
-.detail-btn, .fav-btn
+.detail-btn, .fav-btn, .unfav-btn
 	flex: 1
 	width: 100%
 	border: none
@@ -281,6 +335,67 @@
 	&:hover
 		background: rgba(255, 200, 50, 0.1)
 		color: rgba(255, 200, 50, 1)
+
+.unfav-btn
+	border-radius: 0 0 6px 0
+	color: rgba(255, 100, 100, 0.8)
+	font-size: 0.85rem
+
+	&:hover
+		background: rgba(255, 100, 100, 0.15)
+
+// Delete confirmation modal
+.backdrop
+	position: fixed
+	inset: 0
+	background: rgba(0, 0, 0, 0.6)
+	z-index: 200
+	display: flex
+	align-items: center
+	justify-content: center
+	padding: 20px
+
+.modal
+	background: #2a2a2a
+	border: 1px solid #555
+	border-radius: 8px
+	padding: 24px
+	max-width: 360px
+	width: 100%
+
+.modal-message
+	margin: 0 0 20px
+	font-size: 1rem
+	color: rgba(255, 255, 255, 0.9)
+	line-height: 1.6
+	overflow-wrap: break-word
+
+.modal-actions
+	display: flex
+	gap: 8px
+	justify-content: flex-end
+
+.btn
+	padding: 8px 16px
+	border: 1px solid #555
+	border-radius: 4px
+	cursor: pointer
+	font-size: 0.85rem
+
+.btn-cancel
+	background: transparent
+	color: rgba(255, 255, 255, 0.7)
+
+	&:hover
+		background: rgba(255, 255, 255, 0.08)
+
+.btn-delete
+	background: rgba(255, 100, 100, 0.2)
+	color: rgba(255, 100, 100, 0.9)
+	border-color: rgba(255, 100, 100, 0.4)
+
+	&:hover
+		background: rgba(255, 100, 100, 0.3)
 
 // Desktop
 @media (min-width: 800px)
