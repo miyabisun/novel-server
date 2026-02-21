@@ -102,6 +102,96 @@
 		if (e.target === e.currentTarget) cancelDelete();
 	}
 
+	// Bidirectional swipe action for touch devices
+	function swipeable(node, opts) {
+		let startX, startY, offsetX, locked, horizontal;
+		let { isFav, novel } = opts;
+		let bgAdd, bgDelete;
+
+		function preventClick(e) {
+			e.stopPropagation();
+			e.preventDefault();
+		}
+
+		function onStart(e) {
+			const touch = e.touches[0];
+			startX = touch.clientX;
+			startY = touch.clientY;
+			offsetX = 0;
+			locked = false;
+			horizontal = false;
+			bgAdd = node.parentElement.querySelector('.swipe-bg-add');
+			bgDelete = node.parentElement.querySelector('.swipe-bg-delete');
+			node.style.transition = 'none';
+			if (bgAdd) bgAdd.style.transition = 'none';
+			if (bgDelete) bgDelete.style.transition = 'none';
+		}
+
+		function onMove(e) {
+			const touch = e.touches[0];
+			const dx = touch.clientX - startX;
+			const dy = touch.clientY - startY;
+
+			if (!locked) {
+				if (Math.abs(dx) < 5 && Math.abs(dy) < 5) return;
+				locked = true;
+				horizontal = Math.abs(dx) > Math.abs(dy);
+			}
+			if (!horizontal) return;
+
+			e.preventDefault();
+			// Left swipe (delete): only if fav; Right swipe (add): only if not fav
+			if (dx < 0 && isFav) {
+				offsetX = Math.max(-80, dx);
+			} else if (dx > 0 && !isFav) {
+				offsetX = Math.min(80, dx);
+			} else {
+				offsetX = 0;
+			}
+			node.style.transform = `translateX(${offsetX}px)`;
+			if (bgDelete) bgDelete.style.opacity = Math.min(1, Math.max(0, -offsetX) / 40);
+			if (bgAdd) bgAdd.style.opacity = Math.min(1, Math.max(0, offsetX) / 40);
+		}
+
+		function onEnd() {
+			if (!locked) return;
+			if (horizontal) {
+				node.addEventListener('click', preventClick, { once: true, capture: true });
+				if (offsetX < -40 && isFav) confirmDelete(novel);
+				if (offsetX > 40 && !isFav) addFavorite(novel);
+			}
+			node.style.transition = 'transform 0.2s ease';
+			node.style.transform = 'translateX(0)';
+			if (bgDelete) {
+				bgDelete.style.transition = 'opacity 0.2s ease';
+				bgDelete.style.opacity = 0;
+			}
+			if (bgAdd) {
+				bgAdd.style.transition = 'opacity 0.2s ease';
+				bgAdd.style.opacity = 0;
+			}
+			offsetX = 0;
+		}
+
+		node.addEventListener('touchstart', onStart, { passive: true });
+		node.addEventListener('touchmove', onMove, { passive: false });
+		node.addEventListener('touchend', onEnd, { passive: true });
+		node.addEventListener('touchcancel', onEnd, { passive: true });
+
+		return {
+			update(newOpts) {
+				isFav = newOpts.isFav;
+				novel = newOpts.novel;
+			},
+			destroy() {
+				node.removeEventListener('touchstart', onStart);
+				node.removeEventListener('touchmove', onMove);
+				node.removeEventListener('touchend', onEnd);
+				node.removeEventListener('touchcancel', onEnd);
+			},
+		};
+	}
+
 	$effect(() => {
 		activePeriod = 'daily';
 		loadRanking(type, 'daily');
@@ -143,21 +233,29 @@
 		{#each visibleGenres as [genre, novels]}
 			<div class="novel-grid">
 				{#each novels as novel, i}
-					<div class="novel-card">
-						<div class="card-body">
-							<div class="card-header">
-								<span class="card-rank">{i + 1}位</span>
-								<span class="card-page" class:tanpen={novel.noveltype === 2}>{novel.noveltype === 2 ? '短編' : `${novel.page}話`}</span>
+					<div class="novel-card-wrapper">
+						<div class="swipe-bg-add">追加</div>
+						<div class="swipe-bg-delete">削除</div>
+						<div
+							class="novel-card"
+							class:is-fav={favIds.has(novel.id)}
+							use:swipeable={{ isFav: favIds.has(novel.id), novel }}
+						>
+							<div class="card-body">
+								<div class="card-header">
+									<span class="card-rank">{i + 1}位</span>
+									<span class="card-page" class:tanpen={novel.noveltype === 2}>{novel.noveltype === 2 ? '短編' : `${novel.page}話`}</span>
+								</div>
+								<div class="card-title"><a href={link(`/novel/${type}/${novel.id}/1`)}>{decodeHtml(novel.title)}</a></div>
 							</div>
-							<div class="card-title"><a href={link(`/novel/${type}/${novel.id}/1`)}>{decodeHtml(novel.title)}</a></div>
-						</div>
-						<div class="card-actions">
-							<button class="detail-btn" onclick={() => selectedNovel = novel}>📖</button>
-							{#if favIds.has(novel.id)}
-								<button class="unfav-btn" onclick={() => confirmDelete(novel)}>✕</button>
-							{:else}
-								<button class="fav-btn" onclick={() => addFavorite(novel)}>☆</button>
-							{/if}
+							<div class="card-actions">
+								<button class="detail-btn" onclick={() => selectedNovel = novel}>📖</button>
+								{#if favIds.has(novel.id)}
+									<button class="unfav-btn" onclick={() => confirmDelete(novel)}>✕</button>
+								{:else}
+									<button class="fav-btn" onclick={() => addFavorite(novel)}>☆</button>
+								{/if}
+							</div>
 						</div>
 					</div>
 				{/each}
@@ -192,105 +290,110 @@
 
 <style lang="sass">
 .ranking
-	padding: 12px 15px 0
+	padding: var(--sp-4) var(--sp-4) 0
 
 .toolbar
 	display: flex
 	justify-content: space-between
 	align-items: center
-	margin-bottom: 12px
+	margin-bottom: var(--sp-4)
 	flex-wrap: wrap
-	gap: 8px
+	gap: var(--sp-3)
 
 .period-tabs
 	display: flex
-	gap: 4px
+	gap: var(--sp-1)
 	margin-left: auto
 
 .period-tab
-	padding: 4px 10px
-	border: 1px solid #444
+	padding: var(--sp-1) var(--sp-3)
+	border: 1px solid var(--c-border)
 	background: transparent
-	color: rgba(255, 255, 255, 0.6)
+	color: var(--c-text-sub)
 	cursor: pointer
-	border-radius: 3px
-	font-size: 0.8rem
+	border-radius: var(--radius-sm)
+	font-size: var(--fs-xs)
 
 	&:hover
-		background: rgba(255, 255, 255, 0.08)
+		background: var(--c-overlay-2)
 
 	&.active
-		background: rgba(255, 255, 255, 0.15)
+		background: var(--c-overlay-3)
 		color: white
-		border-color: rgba(128, 192, 255, 0.5)
+		border-color: var(--c-accent-active)
 
 .status
 	text-align: center
-	padding: 20px
-	color: rgba(255, 255, 255, 0.6)
+	padding: var(--sp-5)
+	color: var(--c-text-sub)
 
 	&.error
 		color: #ff6b6b
 
 .genre-tabs
 	display: flex
-	gap: 4px
+	gap: var(--sp-1)
 	flex-wrap: wrap
 
 .genre-tab
-	padding: 4px 12px
-	border: 1px solid #444
+	padding: var(--sp-1) var(--sp-4)
+	border: 1px solid var(--c-border)
 	background: transparent
-	color: rgba(255, 255, 255, 0.6)
+	color: var(--c-text-sub)
 	cursor: pointer
-	border-radius: 3px
-	font-size: 0.85rem
+	border-radius: var(--radius-sm)
+	font-size: var(--fs-sm)
 
 	&:hover
-		background: rgba(255, 255, 255, 0.08)
+		background: var(--c-overlay-2)
 
 	&.active
-		background: rgba(255, 255, 255, 0.15)
+		background: var(--c-overlay-3)
 		color: white
-		border-color: rgba(128, 192, 255, 0.5)
+		border-color: var(--c-accent-active)
 
 .novel-grid
 	display: flex
 	flex-direction: column
-	gap: 8px
+	gap: var(--sp-3)
+
+.novel-card-wrapper
+	border: 1px solid var(--c-border)
+	border-radius: var(--radius-md)
 
 .novel-card
 	display: flex
-	border: 1px solid #444
-	border-radius: 6px
 
-	&:hover
-		background-color: rgba(255, 255, 255, 0.08)
+	&.is-fav
+		border-left: 3px solid var(--c-fav-border)
+
+.swipe-bg-add, .swipe-bg-delete
+	display: none
 
 .card-body
 	flex: 1
 	min-width: 0
 	display: flex
 	flex-direction: column
-	gap: 4px
-	padding: 8px
+	gap: var(--sp-1)
+	padding: var(--sp-3)
 
 .card-header
 	display: flex
 	align-items: center
-	gap: 8px
+	gap: var(--sp-3)
 
 .card-rank
-	font-size: 0.8rem
+	font-size: var(--fs-xs)
 	font-weight: bold
-	color: rgba(255, 255, 255, 0.5)
+	color: var(--c-text-muted)
 
 .card-page
-	font-size: 0.8rem
-	color: rgba(255, 255, 255, 0.5)
+	font-size: var(--fs-xs)
+	color: var(--c-text-muted)
 
 	&.tanpen
-		color: rgba(255, 255, 255, 0.4)
+		color: var(--c-text-faint)
 
 .card-title
 	line-height: 1.4
@@ -307,7 +410,7 @@
 	flex-direction: column
 	flex-shrink: 0
 	width: 40px
-	border-left: 1px solid #444
+	border-left: 1px solid var(--c-border)
 
 .detail-btn, .fav-btn, .unfav-btn
 	flex: 1
@@ -319,95 +422,139 @@
 	display: flex
 	align-items: center
 	justify-content: center
-	font-size: 0.9rem
+	font-size: var(--fs-sm)
 
 .detail-btn
-	border-bottom: 1px solid #444
-	border-radius: 0 6px 0 0
+	border-bottom: 1px solid var(--c-border)
+	border-radius: 0 var(--radius-md) 0 0
 
 	&:hover
-		background: rgba(128, 192, 255, 0.15)
+		background: var(--c-accent-subtle)
 
 .fav-btn
-	border-radius: 0 0 6px 0
-	color: rgba(255, 200, 50, 0.8)
+	border-radius: 0 0 var(--radius-md) 0
+	color: var(--c-fav)
 
 	&:hover
-		background: rgba(255, 200, 50, 0.1)
-		color: rgba(255, 200, 50, 1)
+		background: var(--c-fav-hover)
+		color: var(--c-fav-bright)
 
 .unfav-btn
-	border-radius: 0 0 6px 0
-	color: rgba(255, 100, 100, 0.8)
-	font-size: 0.85rem
+	border-radius: 0 0 var(--radius-md) 0
+	color: var(--c-danger-dim)
+	font-size: var(--fs-sm)
 
 	&:hover
-		background: rgba(255, 100, 100, 0.15)
+		background: var(--c-danger-hover)
 
 // Delete confirmation modal
 .backdrop
 	position: fixed
 	inset: 0
-	background: rgba(0, 0, 0, 0.6)
+	background: var(--c-backdrop)
 	z-index: 200
 	display: flex
 	align-items: center
 	justify-content: center
-	padding: 20px
+	padding: var(--sp-5)
 
 .modal
-	background: #2a2a2a
-	border: 1px solid #555
-	border-radius: 8px
-	padding: 24px
+	background: var(--c-surface)
+	border: 1px solid var(--c-border-strong)
+	border-radius: var(--radius-lg)
+	padding: var(--sp-5)
 	max-width: 360px
 	width: 100%
 
 .modal-message
-	margin: 0 0 20px
-	font-size: 1rem
-	color: rgba(255, 255, 255, 0.9)
+	margin: 0 0 var(--sp-5)
+	font-size: var(--fs-md)
+	color: var(--c-text)
 	line-height: 1.6
 	overflow-wrap: break-word
 
 .modal-actions
 	display: flex
-	gap: 8px
+	gap: var(--sp-3)
 	justify-content: flex-end
 
 .btn
-	padding: 8px 16px
-	border: 1px solid #555
-	border-radius: 4px
+	padding: var(--sp-3) var(--sp-4)
+	border: 1px solid var(--c-border-strong)
+	border-radius: var(--radius-sm)
 	cursor: pointer
-	font-size: 0.85rem
+	font-size: var(--fs-sm)
 
 .btn-cancel
 	background: transparent
-	color: rgba(255, 255, 255, 0.7)
+	color: var(--c-text-sub)
 
 	&:hover
-		background: rgba(255, 255, 255, 0.08)
+		background: var(--c-overlay-2)
 
 .btn-delete
-	background: rgba(255, 100, 100, 0.2)
-	color: rgba(255, 100, 100, 0.9)
-	border-color: rgba(255, 100, 100, 0.4)
+	background: var(--c-danger-bg)
+	color: var(--c-danger)
+	border-color: var(--c-danger-border)
 
 	&:hover
-		background: rgba(255, 100, 100, 0.3)
+		background: var(--c-danger-bg-hover)
 
 // Desktop
 @media (min-width: 800px)
 	.toolbar
 		position: sticky
 		top: 0
-		background: #222
+		background: var(--c-bg)
 		z-index: 50
-		padding-top: 12px
-		padding-bottom: 12px
+		padding-top: var(--sp-4)
+		padding-bottom: var(--sp-4)
 		margin-bottom: 0
 
+	.novel-card-wrapper:hover .novel-card
+		background-color: var(--c-overlay-2)
+
 	.card-title
-		font-size: 1rem
+		font-size: var(--fs-md)
+
+// Mobile: swipe actions
+@media (max-width: 799px)
+	.novel-card-wrapper
+		position: relative
+		overflow: hidden
+
+	.novel-card
+		background: var(--c-bg)
+		position: relative
+		z-index: 1
+
+	.fav-btn, .unfav-btn
+		display: none
+
+	.detail-btn
+		border-bottom: none
+		border-radius: 0 var(--radius-md) var(--radius-md) 0
+
+	.swipe-bg-add, .swipe-bg-delete
+		display: flex
+		align-items: center
+		position: absolute
+		top: 0
+		bottom: 0
+		width: 80px
+		font-weight: bold
+		font-size: var(--fs-sm)
+		opacity: 0
+
+	.swipe-bg-add
+		left: 0
+		justify-content: flex-start
+		padding-left: var(--sp-5)
+		color: var(--c-fav)
+
+	.swipe-bg-delete
+		right: 0
+		justify-content: flex-end
+		padding-right: var(--sp-5)
+		color: var(--c-danger)
 </style>

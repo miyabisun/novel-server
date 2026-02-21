@@ -36,7 +36,7 @@ The database is automatically created on first startup.
 
 ## Features
 
-- **Rankings** — Browse rankings from Narou / Kakuyomu / Nocturne with period selection and synopsis preview
+- **Rankings** — Browse rankings with period selection, synopsis preview, and swipe-to-add/remove favorites on mobile
 - **Reader** — Keyboard-navigable (arrow keys) page turning
 - **Favorites** — Add from rankings with ★, auto-sync metadata (page count, update time)
 - **Reading Progress** — Automatically saved when a page loads in the reader

@@ -30,12 +30,12 @@
 
 <style lang="sass">
 header
-	padding: 0 15px
+	padding: 0 var(--sp-4)
 	display: flex
 	align-items: center
 	justify-content: space-between
-	border-bottom: 1px solid #444
-	background: #222
+	border-bottom: 1px solid var(--c-border)
+	background: var(--c-bg)
 
 .nav-left
 	display: flex
@@ -43,11 +43,11 @@ header
 	gap: 0
 
 .title
-	color: rgba(255, 255, 255, 0.5)
-	font-size: 0.85rem
-	padding: 10px 12px 10px 0
-	margin-right: 4px
-	border-right: 1px solid #444
+	color: var(--c-text-muted)
+	font-size: var(--fs-sm)
+	padding: var(--sp-3) var(--sp-4) var(--sp-3) 0
+	margin-right: var(--sp-1)
+	border-right: 1px solid var(--c-border)
 	user-select: none
 	pointer-events: none
 
@@ -55,16 +55,16 @@ header
 		display: none
 
 .nav-item
-	padding: 10px 12px
-	color: rgba(255, 255, 255, 0.6)
+	padding: var(--sp-3) var(--sp-4)
+	color: var(--c-text-sub)
 	text-decoration: none
-	font-size: 0.85rem
+	font-size: var(--fs-sm)
 	border-bottom: 2px solid transparent
 	margin-bottom: -1px
 
 	&:hover
-		color: rgba(255, 255, 255, 0.85)
-		background: rgba(255, 255, 255, 0.05)
+		color: var(--c-text)
+		background: var(--c-overlay-1)
 
 	&.active
 		color: white

@@ -64,6 +64,7 @@
 	// Swipe action for touch devices
 	function swipeable(node, opts) {
 		let startX, startY, offsetX, locked, horizontal;
+		let swipeBg;
 		const { onConfirmDelete } = opts;
 
 		function preventClick(e) {
@@ -78,7 +79,9 @@
 			offsetX = 0;
 			locked = false;
 			horizontal = false;
+			swipeBg = node.previousElementSibling;
 			node.style.transition = 'none';
+			if (swipeBg) swipeBg.style.transition = 'none';
 		}
 
 		function onMove(e) {
@@ -96,6 +99,7 @@
 			e.preventDefault();
 			offsetX = Math.max(-80, Math.min(0, dx));
 			node.style.transform = `translateX(${offsetX}px)`;
+			if (swipeBg) swipeBg.style.opacity = Math.min(1, Math.abs(offsetX) / 40);
 		}
 
 		function onEnd() {
@@ -106,6 +110,10 @@
 			}
 			node.style.transition = 'transform 0.2s ease';
 			node.style.transform = 'translateX(0)';
+			if (swipeBg) {
+				swipeBg.style.transition = 'opacity 0.2s ease';
+				swipeBg.style.opacity = 0;
+			}
 			offsetX = 0;
 		}
 
@@ -181,52 +189,53 @@
 
 <style lang="sass">
 .favorites
-	padding: 0 15px
+	padding: 0 var(--sp-4)
 
 .fav-grid
 	display: flex
 	flex-direction: column
-	gap: 8px
+	gap: var(--sp-3)
 
 .fav-wrapper
-	border-radius: 6px
-	border: 1px solid #444
+	border-radius: var(--radius-md)
+	border: 1px solid var(--c-border)
 
 .fav-card
 	display: flex
 	color: inherit
 
-.fav-wrapper:hover .fav-card
-	background-color: rgba(255, 255, 255, 0.08)
+@media (min-width: 800px)
+	.fav-wrapper:hover .fav-card
+		background-color: var(--c-surface-hover)
 
 .card-body
 	flex: 1
 	min-width: 0
 	display: flex
 	flex-direction: column
-	gap: 4px
-	padding: 10px
+	gap: var(--sp-1)
+	padding: var(--sp-3)
 
 .card-header
 	display: flex
 	justify-content: space-between
 	align-items: center
-	gap: 8px
+	gap: var(--sp-3)
 
 .card-info
-	font-size: 0.8rem
-	color: rgba(255, 255, 255, 0.5)
+	font-size: var(--fs-xs)
+	color: var(--c-text-muted)
 
 .card-updated
-	color: rgba(255, 255, 255, 0.35)
-	margin-left: 6px
+	color: var(--c-text-faint)
+	margin-left: var(--sp-2)
 
 .card-type
-	font-size: 0.7rem
+	font-size: var(--fs-xs)
 	color: var(--type-color, rgba(255, 255, 255, 0.4))
 	border: 1px solid var(--type-color, rgba(255, 255, 255, 0.2))
-	border-radius: 3px
-	padding: 1px 5px
+	border-radius: var(--radius-sm)
+	padding: 1px var(--sp-2)
 	flex-shrink: 0
 
 .card-title
@@ -240,33 +249,33 @@
 			text-decoration: underline
 
 	@media (min-width: 769px)
-		font-size: 1rem
+		font-size: var(--fs-md)
 
 .card-actions
 	display: flex
 	align-items: center
 	flex-shrink: 0
-	border-left: 1px solid #444
+	border-left: 1px solid var(--c-border)
 
 .swipe-bg
 	display: none
 
 .delete-btn
-	padding: 0 12px
+	padding: 0 var(--sp-4)
 	border: none
 	background: transparent
-	color: rgba(255, 100, 100, 0.8)
+	color: var(--c-danger-dim)
 	cursor: pointer
-	font-size: 0.85rem
+	font-size: var(--fs-sm)
 	height: 100%
 
 	&:hover
-		background: rgba(255, 100, 100, 0.15)
+		background: var(--c-danger-hover)
 
 .status
 	text-align: center
-	padding: 20px
-	color: rgba(255, 255, 255, 0.6)
+	padding: var(--sp-5)
+	color: var(--c-text-sub)
 
 	&.error
 		color: #ff6b6b
@@ -275,54 +284,54 @@
 .backdrop
 	position: fixed
 	inset: 0
-	background: rgba(0, 0, 0, 0.6)
+	background: var(--c-backdrop)
 	z-index: 200
 	display: flex
 	align-items: center
 	justify-content: center
-	padding: 20px
+	padding: var(--sp-5)
 
 .modal
-	background: #2a2a2a
-	border: 1px solid #555
-	border-radius: 8px
-	padding: 24px
+	background: var(--c-surface)
+	border: 1px solid var(--c-border-strong)
+	border-radius: var(--radius-lg)
+	padding: var(--sp-5)
 	max-width: 360px
 	width: 100%
 
 .modal-message
-	margin: 0 0 20px
-	font-size: 1rem
-	color: rgba(255, 255, 255, 0.9)
+	margin: 0 0 var(--sp-5)
+	font-size: var(--fs-md)
+	color: var(--c-text)
 	line-height: 1.6
 	overflow-wrap: break-word
 
 .modal-actions
 	display: flex
-	gap: 8px
+	gap: var(--sp-3)
 	justify-content: flex-end
 
 .btn
-	padding: 8px 16px
-	border: 1px solid #555
-	border-radius: 4px
+	padding: var(--sp-3) var(--sp-4)
+	border: 1px solid var(--c-border-strong)
+	border-radius: var(--radius-sm)
 	cursor: pointer
-	font-size: 0.85rem
+	font-size: var(--fs-sm)
 
 .btn-cancel
 	background: transparent
-	color: rgba(255, 255, 255, 0.7)
+	color: var(--c-text-sub)
 
 	&:hover
-		background: rgba(255, 255, 255, 0.08)
+		background: var(--c-overlay-2)
 
 .btn-delete
-	background: rgba(255, 100, 100, 0.2)
-	color: rgba(255, 100, 100, 0.9)
-	border-color: rgba(255, 100, 100, 0.4)
+	background: var(--c-danger-bg)
+	color: var(--c-danger)
+	border-color: var(--c-danger-border)
 
 	&:hover
-		background: rgba(255, 100, 100, 0.3)
+		background: var(--c-danger-bg-hover)
 
 // Mobile: swipe-to-delete
 @media (max-width: 799px)
@@ -331,7 +340,7 @@
 		overflow: hidden
 
 	.fav-card
-		background: #222
+		background: var(--c-bg)
 		position: relative
 		z-index: 1
 
@@ -342,13 +351,14 @@
 		display: flex
 		align-items: center
 		justify-content: flex-end
-		padding-right: 20px
+		padding-right: var(--sp-5)
 		position: absolute
 		right: 0
 		top: 0
 		bottom: 0
 		width: 80px
-		color: rgba(255, 100, 100, 0.9)
+		color: var(--c-danger)
 		font-weight: bold
-		font-size: 0.9rem
+		font-size: var(--fs-sm)
+		opacity: 0
 </style>

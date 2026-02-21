@@ -101,18 +101,18 @@
 .backdrop
 	position: fixed
 	inset: 0
-	background: rgba(0, 0, 0, 0.6)
+	background: var(--c-backdrop)
 	z-index: 200
 	display: flex
 	align-items: center
 	justify-content: center
-	padding: 20px
+	padding: var(--sp-5)
 
 .modal
-	background: #2a2a2a
-	border: 1px solid #555
-	border-radius: 8px
-	padding: 24px
+	background: var(--c-surface)
+	border: 1px solid var(--c-border-strong)
+	border-radius: var(--radius-lg)
+	padding: var(--sp-5)
 	max-width: 540px
 	width: 100%
 	max-height: 80vh
@@ -121,12 +121,12 @@
 
 .close-btn
 	position: absolute
-	top: 12px
-	right: 12px
+	top: var(--sp-4)
+	right: var(--sp-4)
 	background: transparent
 	border: none
-	color: rgba(255, 255, 255, 0.6)
-	font-size: 1.5rem
+	color: var(--c-text-sub)
+	font-size: var(--fs-xl)
 	cursor: pointer
 	line-height: 1
 
@@ -134,54 +134,54 @@
 		color: white
 
 .title
-	margin: 0 0 16px
-	font-size: 1.1rem
+	margin: 0 0 var(--sp-4)
+	font-size: var(--fs-lg)
 	color: white
 	padding-right: 30px
 
 .status
-	color: rgba(255, 255, 255, 0.6)
+	color: var(--c-text-sub)
 	text-align: center
-	padding: 20px 0
+	padding: var(--sp-5) 0
 
 	&.error
 		color: #ff6b6b
 
 .synopsis
 	white-space: pre-wrap
-	color: rgba(255, 255, 255, 0.85)
-	font-size: 0.9rem
+	color: var(--c-text)
+	font-size: var(--fs-sm)
 	line-height: 1.7
 	max-height: 40vh
 	overflow-y: auto
-	margin-bottom: 20px
+	margin-bottom: var(--sp-5)
 
 .actions
 	display: flex
-	gap: 8px
+	gap: var(--sp-3)
 
 .btn
-	padding: 8px 16px
-	border: 1px solid #555
-	border-radius: 4px
+	padding: var(--sp-3) var(--sp-4)
+	border: 1px solid var(--c-border-strong)
+	border-radius: var(--radius-sm)
 	cursor: pointer
-	font-size: 0.85rem
+	font-size: var(--fs-sm)
 
 .btn-primary
-	background: rgba(128, 192, 255, 0.2)
-	color: rgba(128, 192, 255, 0.9)
-	border-color: rgba(128, 192, 255, 0.4)
+	background: var(--c-accent-bg)
+	color: var(--c-accent)
+	border-color: var(--c-accent-border)
 
 	&:hover
-		background: rgba(128, 192, 255, 0.3)
+		background: var(--c-accent-bg-hover)
 
 .btn-fav
 	background: transparent
-	color: rgba(255, 200, 50, 0.8)
-	border-color: rgba(255, 200, 50, 0.3)
+	color: var(--c-fav)
+	border-color: var(--c-fav-border)
 
 	&:hover:not(:disabled)
-		background: rgba(255, 200, 50, 0.1)
+		background: var(--c-fav-hover)
 
 	&:disabled
 		cursor: default

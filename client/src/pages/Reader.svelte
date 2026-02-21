@@ -251,7 +251,7 @@
 
 <style lang="sass">
 .reader
-	padding: 0 15px
+	padding: 0 var(--sp-4)
 	max-width: 800px
 	margin: 0 auto
 
@@ -259,10 +259,10 @@
 	display: flex
 	align-items: center
 	justify-content: space-between
-	padding: 8px 2.5%
-	background: #2a2a2a
-	border-bottom: 1px solid #444
-	gap: 8px
+	padding: var(--sp-3) 2.5%
+	background: var(--c-surface)
+	border-bottom: 1px solid var(--c-border)
+	gap: var(--sp-3)
 	z-index: 50
 
 	&.top
@@ -270,8 +270,8 @@
 		top: 0
 
 .bar-title
-	color: rgba(255, 255, 255, 0.75)
-	font-size: 0.85rem
+	color: var(--c-text-sub)
+	font-size: var(--fs-sm)
 	white-space: nowrap
 	overflow: hidden
 	text-overflow: ellipsis
@@ -281,26 +281,26 @@
 .bar-right
 	display: flex
 	align-items: center
-	gap: 4px
+	gap: var(--sp-1)
 	flex-shrink: 0
 
 .bar-page
-	color: rgba(255, 255, 255, 0.5)
-	font-size: 0.8rem
-	margin-right: 4px
+	color: var(--c-text-muted)
+	font-size: var(--fs-xs)
+	margin-right: var(--sp-1)
 	white-space: nowrap
 
 .nav-btn
-	padding: 4px 14px
-	border: 1px solid #555
+	padding: var(--sp-1) var(--sp-4)
+	border: 1px solid var(--c-border-strong)
 	background: transparent
-	color: rgba(255, 255, 255, 0.7)
+	color: var(--c-text-sub)
 	cursor: pointer
-	border-radius: 4px
-	font-size: 0.85rem
+	border-radius: var(--radius-sm)
+	font-size: var(--fs-sm)
 
 	&:hover:not(:disabled)
-		background: rgba(255, 255, 255, 0.1)
+		background: var(--c-overlay-2)
 
 	&:disabled
 		opacity: 0.3
@@ -311,32 +311,32 @@
 			display: none
 
 .fav-btn
-	padding: 4px 10px
-	border: 1px solid rgba(255, 200, 50, 0.3)
+	padding: var(--sp-1) var(--sp-3)
+	border: 1px solid var(--c-fav-border)
 	background: transparent
-	color: rgba(255, 200, 50, 0.8)
+	color: var(--c-fav)
 	cursor: pointer
-	border-radius: 4px
-	font-size: 1rem
+	border-radius: var(--radius-sm)
+	font-size: var(--fs-md)
 
 	&:hover:not(:disabled)
-		background: rgba(255, 200, 50, 0.1)
+		background: var(--c-fav-hover)
 
 	&:disabled
 		cursor: default
 		opacity: 0.7
 
 .fav-btn-remove
-	padding: 4px 10px
-	border: 1px solid rgba(255, 100, 100, 0.4)
+	padding: var(--sp-1) var(--sp-3)
+	border: 1px solid var(--c-danger-border)
 	background: transparent
-	color: rgba(255, 100, 100, 0.8)
+	color: var(--c-danger-dim)
 	cursor: pointer
-	border-radius: 4px
-	font-size: 1rem
+	border-radius: var(--radius-sm)
+	font-size: var(--fs-md)
 
 	&:hover:not(:disabled)
-		background: rgba(255, 100, 100, 0.1)
+		background: var(--c-danger-hover)
 
 	&:disabled
 		cursor: default
@@ -344,14 +344,14 @@
 
 .status
 	text-align: center
-	padding: 40px
-	color: rgba(255, 255, 255, 0.6)
+	padding: var(--sp-6)
+	color: var(--c-text-sub)
 
 	&.error
 		color: #ff6b6b
 
 .content
-	padding: 16px 0
+	padding: var(--sp-4) 0
 	line-height: 2
 	font-size: 1.05rem
 
@@ -365,20 +365,20 @@
 	position: fixed
 	top: 50%
 	transform: translateY(-50%)
-	padding: 12px 16px
+	padding: var(--sp-4)
 	background: rgba(0, 0, 0, 0.7)
-	color: rgba(255, 255, 255, 0.6)
-	font-size: 0.85rem
-	border-radius: 8px
+	color: var(--c-text-sub)
+	font-size: var(--fs-sm)
+	border-radius: var(--radius-lg)
 	z-index: 100
 	pointer-events: none
 	transition: background 0.15s, color 0.15s
 
 	&.left
-		left: 12px
+		left: var(--sp-4)
 
 	&.right
-		right: 12px
+		right: var(--sp-4)
 
 	&.ready
 		background: rgba(0, 0, 0, 0.85)
@@ -390,53 +390,53 @@
 .backdrop
 	position: fixed
 	inset: 0
-	background: rgba(0, 0, 0, 0.6)
+	background: var(--c-backdrop)
 	z-index: 200
 	display: flex
 	align-items: center
 	justify-content: center
-	padding: 20px
+	padding: var(--sp-5)
 
 .modal
-	background: #2a2a2a
-	border: 1px solid #555
-	border-radius: 8px
-	padding: 24px
+	background: var(--c-surface)
+	border: 1px solid var(--c-border-strong)
+	border-radius: var(--radius-lg)
+	padding: var(--sp-5)
 	max-width: 360px
 	width: 100%
 
 .modal-message
-	margin: 0 0 20px
-	font-size: 1rem
-	color: rgba(255, 255, 255, 0.9)
+	margin: 0 0 var(--sp-5)
+	font-size: var(--fs-md)
+	color: var(--c-text)
 	line-height: 1.6
 	overflow-wrap: break-word
 
 .modal-actions
 	display: flex
-	gap: 8px
+	gap: var(--sp-3)
 	justify-content: flex-end
 
 .btn
-	padding: 8px 16px
-	border: 1px solid #555
-	border-radius: 4px
+	padding: var(--sp-3) var(--sp-4)
+	border: 1px solid var(--c-border-strong)
+	border-radius: var(--radius-sm)
 	cursor: pointer
-	font-size: 0.85rem
+	font-size: var(--fs-sm)
 
 .btn-cancel
 	background: transparent
-	color: rgba(255, 255, 255, 0.7)
+	color: var(--c-text-sub)
 
 	&:hover
-		background: rgba(255, 255, 255, 0.08)
+		background: var(--c-overlay-2)
 
 .btn-delete
-	background: rgba(255, 100, 100, 0.2)
-	color: rgba(255, 100, 100, 0.9)
-	border-color: rgba(255, 100, 100, 0.4)
+	background: var(--c-danger-bg)
+	color: var(--c-danger)
+	border-color: var(--c-danger-border)
 
 	&:hover
-		background: rgba(255, 100, 100, 0.3)
+		background: var(--c-danger-bg-hover)
 
 </style>
