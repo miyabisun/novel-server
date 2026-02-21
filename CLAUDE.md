@@ -2,8 +2,14 @@
 
 ## Review
 
-- After updating files, always call `/rev` to get a review before considering the task complete
-- When multiple files are changed, a single review at the end is sufficient
+After completing changes with `/dev`, follow this review cycle:
+
+1. `/rev` to review changes
+2. Fix Critical / Warning / Suggestion via `/dev` (repeat 1-2 until clean)
+3. `/rev` to catch missing doc updates, fix via `/dev`
+4. Report subjective or ambiguous items for human decision
+
+- A single review cycle at the end is sufficient for multi-file changes
 
 ## Documentation
 
