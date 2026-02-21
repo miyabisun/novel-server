@@ -115,6 +115,21 @@ DB パスは環境変数 `DATABASE_PATH` で指定します（デフォルト: `
 
 ## フロントエンド
 
+### デザインシステム
+
+`global.sass` の `:root` に CSS custom properties としてデザイントークンを定義しています。[LiftKit](https://liftkit.happykit.dev/) の設計思想をベースに、黄金比（φ ≈ 1.618）でスケーリングしています。
+
+| カテゴリ | プレフィックス | 例 |
+|----------|----------------|-----|
+| Spacing | `--sp-*` | `--sp-1: 4px` 〜 `--sp-6: 42px` |
+| Font Size | `--fs-*` | `--fs-xs: 0.72rem` 〜 `--fs-xl: 1.62rem` |
+| Border Radius | `--radius-*` | `--radius-sm: 4px` 〜 `--radius-lg: 10px` |
+| Color (surface) | `--c-bg`, `--c-surface` | 背景・カード面 |
+| Color (text) | `--c-text-*` | `--c-text`（主）〜 `--c-text-faint`（最淡） |
+| Color (semantic) | `--c-accent-*`, `--c-danger-*`, `--c-fav-*` | アクセント・危険・お気に入り |
+
+全コンポーネントでハードコードされた値の代わりにこれらのトークンを使用しています。
+
 ### ルーティング
 
 自前の SPA ルーター（`router.svelte.js`）を使用。パターンマッチングでルートインデックスを決定します。
