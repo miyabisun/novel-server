@@ -47,11 +47,26 @@ const nocturne = {
   },
 
   async fetchToc(ncode: string) {
-    const res = await fetch(`https://novel18.syosetu.com/${ncode}/`, {
-      headers: { Cookie: 'over18=yes' },
-    })
+    const baseUrl = `https://novel18.syosetu.com/${ncode}/`
+    const opts = { headers: { Cookie: 'over18=yes' } }
+    const res = await fetch(baseUrl, opts)
     if (!res.ok) throw new Error(`nocturne toc error: ${res.status}`)
-    return parseToc(await res.text())
+    const first = parseToc(await res.text())
+    if (first.lastPage <= 1) return { title: first.title, episodes: first.episodes }
+
+    const remaining = await Promise.all(
+      Array.from({ length: first.lastPage - 1 }, (_, i) =>
+        fetch(`${baseUrl}?p=${i + 2}`, opts).then((r) => {
+          if (!r.ok) throw new Error(`nocturne toc page ${i + 2} error: ${r.status}`)
+          return r.text()
+        }).then((html) => parseToc(html).episodes)
+      )
+    )
+    const allTitles = [...first.episodes, ...remaining.flat()].map((e) => e.title)
+    return {
+      title: first.title,
+      episodes: allTitles.map((t, i) => ({ num: i + 1, title: t })),
+    }
   },
 
   async fetchPage(ncode: string, page: string | number) {

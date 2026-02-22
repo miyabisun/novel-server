@@ -51,9 +51,25 @@ const narou = {
   },
 
   async fetchToc(ncode: string) {
-    const res = await fetch(`https://ncode.syosetu.com/${ncode}/`)
+    const baseUrl = `https://ncode.syosetu.com/${ncode}/`
+    const res = await fetch(baseUrl)
     if (!res.ok) throw new Error(`narou toc error: ${res.status}`)
-    return parseToc(await res.text())
+    const first = parseToc(await res.text())
+    if (first.lastPage <= 1) return { title: first.title, episodes: first.episodes }
+
+    const remaining = await Promise.all(
+      Array.from({ length: first.lastPage - 1 }, (_, i) =>
+        fetch(`${baseUrl}?p=${i + 2}`).then((r) => {
+          if (!r.ok) throw new Error(`narou toc page ${i + 2} error: ${r.status}`)
+          return r.text()
+        }).then((html) => parseToc(html).episodes)
+      )
+    )
+    const allTitles = [...first.episodes, ...remaining.flat()].map((e) => e.title)
+    return {
+      title: first.title,
+      episodes: allTitles.map((t, i) => ({ num: i + 1, title: t })),
+    }
   },
 
   async fetchPage(ncode: string, page: string | number) {

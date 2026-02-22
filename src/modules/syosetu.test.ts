@@ -116,6 +116,7 @@ describe('parseToc', () => {
         { num: 1, title: '第1話 始まり' },
         { num: 2, title: '第2話 展開' },
       ],
+      lastPage: 1,
     })
   })
 
@@ -134,7 +135,7 @@ describe('parseToc', () => {
   test('returns empty episodes when no .p-eplist__sublist found', () => {
     const html = '<h1 class="p-novel__title">短編小説</h1><div>本文</div>'
     const result = parseToc(html)
-    expect(result).toEqual({ title: '短編小説', episodes: [] })
+    expect(result).toEqual({ title: '短編小説', episodes: [], lastPage: 1 })
   })
 
   test('trims whitespace from title and episode titles', () => {
@@ -145,5 +146,24 @@ describe('parseToc', () => {
     const result = parseToc(html)
     expect(result.title).toBe('スペース付き')
     expect(result.episodes[0].title).toBe('第1話')
+  })
+
+  test('extracts lastPage from pagination link', () => {
+    const html = `
+      <h1 class="p-novel__title">長編小説</h1>
+      <div class="p-eplist__sublist"><a href="/n1234ab/1/">第1話</a></div>
+      <a href="/n1234ab/?p=5">最後へ</a>
+    `
+    const result = parseToc(html)
+    expect(result.lastPage).toBe(5)
+  })
+
+  test('returns lastPage 1 when no pagination', () => {
+    const html = `
+      <h1 class="p-novel__title">短め小説</h1>
+      <div class="p-eplist__sublist"><a href="/n1234ab/1/">第1話</a></div>
+    `
+    const result = parseToc(html)
+    expect(result.lastPage).toBe(1)
   })
 })

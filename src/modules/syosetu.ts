@@ -44,7 +44,7 @@ export function createFetchApi(apiUrl: string) {
   }
 }
 
-export function parseToc(html: string): { title: string; episodes: { num: number; title: string }[] } {
+export function parseToc(html: string): { title: string; episodes: { num: number; title: string }[]; lastPage: number } {
   const $ = cheerio.load(html)
   const title = $('.p-novel__title').first().text().trim() || $('title').first().text().trim()
   const episodes: { num: number; title: string }[] = []
@@ -54,7 +54,14 @@ export function parseToc(html: string): { title: string; episodes: { num: number
     const epTitle = $(el).find('a').first().text().trim()
     episodes.push({ num, title: epTitle })
   })
-  return { title, episodes }
+  let lastPage = 1
+  $('a').each((_i, el) => {
+    if ($(el).text().trim() === '最後へ') {
+      const match = ($(el).attr('href') || '').match(/[?&]p=(\d+)/)
+      if (match) lastPage = Number(match[1])
+    }
+  })
+  return { title, episodes, lastPage }
 }
 
 export function parsePage(html: string, selector: string): string | null {
