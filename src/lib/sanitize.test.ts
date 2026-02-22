@@ -24,6 +24,7 @@ describe('sanitizeHtml', () => {
 
   test('removes script tags with content (XSS prevention)', () => {
     expect(sanitizeHtml('<script>alert("xss")</script>')).toBe('')
+    expect(sanitizeHtml('<SCRIPT>alert(1)</SCRIPT>')).toBe('')
   })
 
   test('removes event handler attributes (XSS prevention)', () => {
@@ -47,5 +48,17 @@ describe('sanitizeHtml', () => {
   test('handles mixed allowed and disallowed tags', () => {
     expect(sanitizeHtml('<p><script>bad</script>good</p>'))
       .toBe('<p>good</p>')
+  })
+
+  test('strips HTML comments', () => {
+    expect(sanitizeHtml('hello<!-- evil -->world')).toBe('helloworld')
+  })
+
+  test('removes style tag with content', () => {
+    expect(sanitizeHtml('<style>*{display:none}</style>')).toBe('')
+  })
+
+  test('removes title tag with content', () => {
+    expect(sanitizeHtml('<title>悪意のあるタイトル</title>')).toBe('')
   })
 })

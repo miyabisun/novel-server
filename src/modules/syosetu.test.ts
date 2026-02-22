@@ -37,6 +37,22 @@ describe('mapItem', () => {
       novelupdated_at: '2026-02-22',
     })
   })
+
+  test('handles null ncode without crashing', () => {
+    expect(() => mapItem({ ncode: null })).not.toThrow()
+  })
+
+  test('handles null title without crashing', () => {
+    expect(() => mapItem({ title: null })).not.toThrow()
+  })
+
+  test('handles numeric ncode without crashing', () => {
+    expect(() => mapItem({ ncode: 12345 })).not.toThrow()
+  })
+
+  test('handles numeric title without crashing', () => {
+    expect(() => mapItem({ title: 0 })).not.toThrow()
+  })
 })
 
 describe('buildPages', () => {
@@ -76,6 +92,12 @@ describe('parsePage', () => {
   test('returns null for empty matched content', () => {
     const html = '<div class="target"></div>'
     const result = parsePage(html, '.target')
+    expect(result).toBeNull()
+  })
+
+  test('returns null for whitespace-only content', () => {
+    const html = '<div id="novel_honbun">   \n\t  </div>'
+    const result = parsePage(html, '#novel_honbun')
     expect(result).toBeNull()
   })
 })
