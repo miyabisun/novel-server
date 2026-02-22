@@ -25,6 +25,7 @@ novel-server/
 │       ├── detail.ts           # 小説詳細 API
 │       ├── favorites.ts        # お気に入り CRUD
 │       ├── ranking.ts          # ランキング API
+│       ├── search.ts           # 検索 API
 │       └── pages.ts            # 小説本文 API
 ├── client/                     # フロントエンド（Svelte 5）
 │   ├── src/
@@ -66,6 +67,7 @@ novel-server/
 `src/modules/` 内の各モジュールは以下のインターフェースを実装しています:
 
 - `fetchRankingList(limit?, period?)` — ランキングデータを取得してジャンル別にグループ化（period: `daily` / `weekly` / `monthly` / `quarter` / `yearly`）
+- `fetchSearch(word)` — キーワードで小説を検索（最大 20 件、評価順）
 - `fetchDetail(id)` — 小説のタイトル・あらすじ・総ページ数を取得
 - `fetchPage(id, num)` — 小説の本文 HTML を取得
 - `fetchData(ids)` — 複数小説のメタデータを一括取得（同期用）
@@ -102,6 +104,7 @@ em, strong, b, i, u, s, sub, sup
 | 対象 | TTL | 説明 |
 |------|-----|------|
 | ランキング | 3 時間 | 各サイトのランキングは頻繁には更新されない |
+| 検索結果 | 1 時間 | 新作投稿を早めに反映するため短めの TTL |
 | 小説詳細 | 24 時間 | タイトル・あらすじは基本的に変わらない |
 | ページ本文 | 24 時間 | 小説の本文は基本的に変わらない |
 

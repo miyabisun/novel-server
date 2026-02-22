@@ -46,6 +46,10 @@ const narou = {
     return { title: data[0].title as string, synopsis: (data[0].story as string) ?? '', page: (data[0].page as number) ?? 0 }
   },
 
+  async fetchSearch(word: string) {
+    return fetchApi({ of: ['t', 'w', 'n', 'ga', 'nt'], word, lim: 20, order: 'hyoka' })
+  },
+
   async fetchPage(ncode: string, page: string | number) {
     let res = await fetch(`https://ncode.syosetu.com/${ncode}/${page}/`)
     if (res.status === 404) {

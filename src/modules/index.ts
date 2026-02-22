@@ -6,6 +6,7 @@ interface NovelModule {
   fetchRankingList(limit?: number, period?: string): Promise<Record<string, Record<string, unknown>[]>>
   fetchPage(id: string, pageId: string | number): Promise<string | null>
   fetchDetail(id: string): Promise<{ title: string; synopsis: string; page: number }>
+  fetchSearch(word: string): Promise<Record<string, unknown>[]>
   fetchData(ids: string[]): Promise<Record<string, unknown>[]>
   fetchDatum(id: string): Promise<Record<string, unknown>>
 }

@@ -60,6 +60,47 @@
 
 ---
 
+## 検索 (Search)
+
+### GET `/api/novel/:type/search`
+
+キーワードで小説を検索します。結果は 1 時間キャッシュされます。
+
+**パラメータ:**
+
+| 名前 | 位置 | 値 | 説明 |
+|------|------|-----|------|
+| `type` | path | `narou` / `kakuyomu` / `nocturne` | 対象サイト |
+| `q` | query | 文字列 | 検索キーワード（必須） |
+
+**レスポンス (200):**
+
+```json
+[
+  {
+    "id": "n1234ab",
+    "title": "小説タイトル",
+    "page": 150
+  }
+]
+```
+
+| フィールド | 型 | 説明 |
+|-----------|-----|------|
+| `id` | `string` | 小説 ID |
+| `title` | `string` | タイトル |
+| `page` | `number` | 総ページ数 |
+
+**エラー:**
+
+```json
+{ "error": "Invalid type" }          // 400
+{ "error": "Missing query parameter: q" }  // 400
+{ "error": "Failed to search" }      // 502
+```
+
+---
+
 ## 小説詳細 (Detail)
 
 ### GET `/api/novel/:type/:id/detail`

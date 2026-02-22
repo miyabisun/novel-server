@@ -17,13 +17,37 @@
 	let periods = $derived(allPeriods.filter((p) => !p.exclude?.includes(type)));
 	let activePeriod = $state('daily');
 	let ranking = $state(null);
-	let activeGenre = $state(null);
+	let activeGenre = $state('総合');
 	let loading = $state(false);
 	let error = $state(null);
 	let selectedNovel = $state(null);
 	let favIds = $state(new Set());
 	let deleteTarget = $state(null);
-	let genres = $derived(ranking ? Object.keys(ranking) : []);
+
+	// Search state
+	let searchQuery = $state('');
+	let searchResults = $state(null);
+	let searchLoading = $state(false);
+
+	let isSearchMode = $derived(activeGenre === '検索');
+
+	let genreOptions = $derived.by(() => {
+		if (!ranking) return [];
+		const keys = Object.keys(ranking);
+		if (keys.length > 1) {
+			return ['総合', ...keys, '検索'];
+		}
+		return ['総合', '検索'];
+	});
+
+	let displayNovels = $derived.by(() => {
+		if (isSearchMode) return searchResults ?? [];
+		if (!ranking) return [];
+		if (activeGenre === '総合') {
+			return Object.values(ranking).flat();
+		}
+		return ranking[activeGenre] ?? [];
+	});
 
 	async function loadRanking(t, period) {
 		loading = true;
@@ -35,8 +59,13 @@
 			]);
 			ranking = rankingData;
 			favIds = new Set(favorites.filter((f) => f.type === t).map((f) => f.id));
-			const keys = Object.keys(ranking);
-			activeGenre = keys.length > 1 ? (keys.includes(activeGenre) ? activeGenre : keys[0]) : null;
+			// Reset genre if current genre doesn't exist in new ranking
+			if (activeGenre !== '総合' && activeGenre !== '検索') {
+				const keys = Object.keys(ranking);
+				if (!keys.includes(activeGenre)) {
+					activeGenre = '総合';
+				}
+			}
 		} catch (e) {
 			error = e.message;
 			ranking = null;
@@ -48,6 +77,32 @@
 	function selectPeriod(period) {
 		activePeriod = period;
 		loadRanking(type, period);
+	}
+
+	function selectGenre(value) {
+		activeGenre = value;
+		if (value === '検索') {
+			searchResults = null;
+		}
+	}
+
+	async function executeSearch() {
+		const q = searchQuery.trim();
+		if (!q) return;
+		searchLoading = true;
+		error = null;
+		try {
+			searchResults = await fetcher(`${config.path.api}/novel/${type}/search?q=${encodeURIComponent(q)}`);
+		} catch (e) {
+			error = e.message;
+			searchResults = null;
+		} finally {
+			searchLoading = false;
+		}
+	}
+
+	function handleSearchKeydown(e) {
+		if (e.key === 'Enter') executeSearch();
 	}
 
 	function updateFavIds(id) {
@@ -194,6 +249,9 @@
 
 	$effect(() => {
 		activePeriod = 'daily';
+		activeGenre = '総合';
+		searchQuery = '';
+		searchResults = null;
 		loadRanking(type, 'daily');
 	});
 </script>
@@ -202,65 +260,71 @@
 
 <div class="ranking">
 	<div class="toolbar">
-		{#if genres.length > 1}
-			<div class="genre-tabs">
-				{#each genres as genre}
-					<button
-						class="genre-tab"
-						class:active={activeGenre === genre}
-						onclick={() => activeGenre = genre}
-					>{genre}</button>
-				{/each}
-			</div>
-		{/if}
-		<div class="period-tabs">
-			{#each periods as p}
-				<button
-					class="period-tab"
-					class:active={activePeriod === p.key}
-					onclick={() => selectPeriod(p.key)}
-				>{p.label}</button>
+		<select class="genre-select" value={activeGenre} onchange={(e) => selectGenre(e.target.value)}>
+			{#each genreOptions as opt}
+				<option value={opt}>{opt}</option>
 			{/each}
-		</div>
+		</select>
+		{#if isSearchMode}
+			<div class="search-box">
+				<input
+					class="search-input"
+					type="text"
+					placeholder="タイトルを入力..."
+					bind:value={searchQuery}
+					onkeydown={handleSearchKeydown}
+				/>
+				<button class="search-btn" onclick={executeSearch} disabled={searchLoading}>🔍</button>
+			</div>
+		{:else}
+			<select class="period-select" value={activePeriod} onchange={(e) => selectPeriod(e.target.value)}>
+				{#each periods as p}
+					<option value={p.key}>{p.label}</option>
+				{/each}
+			</select>
+		{/if}
 	</div>
 
-	{#if loading}
+	{#if loading || searchLoading}
 		<p class="status">読み込み中...</p>
 	{:else if error}
 		<p class="status error">{error}</p>
-	{:else if ranking}
-		{@const visibleGenres = activeGenre ? [[activeGenre, ranking[activeGenre] ?? []]] : Object.entries(ranking)}
-		{#each visibleGenres as [genre, novels]}
-			<div class="novel-grid">
-				{#each novels as novel, i}
-					<div class="novel-card-wrapper">
-						<div class="swipe-bg-add">追加</div>
-						<div class="swipe-bg-delete">削除</div>
-						<div
-							class="novel-card"
-							class:is-fav={favIds.has(novel.id)}
-							use:swipeable={{ isFav: favIds.has(novel.id), novel }}
-						>
-							<div class="card-body">
-								<div class="card-header">
+	{:else if isSearchMode && !searchResults}
+		<p class="status">キーワードを入力して検索してください</p>
+	{:else if displayNovels.length > 0}
+		<div class="novel-grid">
+			{#each displayNovels as novel, i}
+				<div class="novel-card-wrapper">
+					<div class="swipe-bg-add">追加</div>
+					<div class="swipe-bg-delete">削除</div>
+					<div
+						class="novel-card"
+						class:is-fav={favIds.has(novel.id)}
+						use:swipeable={{ isFav: favIds.has(novel.id), novel }}
+					>
+						<div class="card-body">
+							<div class="card-header">
+								{#if !isSearchMode}
 									<span class="card-rank">{i + 1}位</span>
-									<span class="card-page" class:tanpen={novel.noveltype === 2}>{novel.noveltype === 2 ? '短編' : `${novel.page}話`}</span>
-								</div>
-								<div class="card-title"><a href={link(`/novel/${type}/${novel.id}/1`)}>{decodeHtml(novel.title)}</a></div>
-							</div>
-							<div class="card-actions">
-								<button class="detail-btn" onclick={() => selectedNovel = novel}>📖</button>
-								{#if favIds.has(novel.id)}
-									<button class="unfav-btn" onclick={() => confirmDelete(novel)}>✕</button>
-								{:else}
-									<button class="fav-btn" onclick={() => addFavorite(novel)}>☆</button>
 								{/if}
+								<span class="card-page" class:tanpen={novel.noveltype === 2}>{novel.noveltype === 2 ? '短編' : `${novel.page}話`}</span>
 							</div>
+							<div class="card-title"><a href={link(`/novel/${type}/${novel.id}/1`)}>{decodeHtml(novel.title)}</a></div>
+						</div>
+						<div class="card-actions">
+							<button class="detail-btn" onclick={() => selectedNovel = novel}>📖</button>
+							{#if favIds.has(novel.id)}
+								<button class="unfav-btn" onclick={() => confirmDelete(novel)}>✕</button>
+							{:else}
+								<button class="fav-btn" onclick={() => addFavorite(novel)}>☆</button>
+							{/if}
 						</div>
 					</div>
-				{/each}
-			</div>
-		{/each}
+				</div>
+			{/each}
+		</div>
+	{:else if isSearchMode && searchResults}
+		<p class="status">検索結果が見つかりませんでした</p>
 	{/if}
 </div>
 
@@ -297,30 +361,65 @@
 	justify-content: space-between
 	align-items: center
 	margin-bottom: var(--sp-4)
-	flex-wrap: wrap
 	gap: var(--sp-3)
 
-.period-tabs
-	display: flex
-	gap: var(--sp-1)
-	margin-left: auto
-
-.period-tab
-	padding: var(--sp-1) var(--sp-3)
+.genre-select, .period-select
+	padding: var(--sp-2) var(--sp-3)
 	border: 1px solid var(--c-border)
-	background: transparent
-	color: var(--c-text-sub)
+	background: var(--c-surface)
+	color: var(--c-text)
+	border-radius: var(--radius-md)
+	font-size: var(--fs-sm)
 	cursor: pointer
-	border-radius: var(--radius-sm)
-	font-size: var(--fs-xs)
+	appearance: auto
+	min-width: 0
+
+.genre-select
+	flex: 1
+	max-width: 200px
+
+.period-select
+	flex-shrink: 0
+
+.search-box
+	display: flex
+	flex: 1
+	gap: var(--sp-1)
+	min-width: 0
+
+.search-input
+	flex: 1
+	min-width: 0
+	padding: var(--sp-2) var(--sp-3)
+	border: 1px solid var(--c-border)
+	background: var(--c-surface)
+	color: var(--c-text)
+	border-radius: var(--radius-md)
+	font-size: var(--fs-sm)
+
+	&::placeholder
+		color: var(--c-text-muted)
+
+	&:focus
+		outline: none
+		border-color: var(--c-accent-active)
+
+.search-btn
+	flex-shrink: 0
+	padding: var(--sp-2) var(--sp-3)
+	border: 1px solid var(--c-border)
+	background: var(--c-surface)
+	color: var(--c-text)
+	border-radius: var(--radius-md)
+	cursor: pointer
+	font-size: var(--fs-sm)
 
 	&:hover
 		background: var(--c-overlay-2)
 
-	&.active
-		background: var(--c-overlay-3)
-		color: white
-		border-color: var(--c-accent-active)
+	&:disabled
+		opacity: 0.5
+		cursor: not-allowed
 
 .status
 	text-align: center
@@ -329,28 +428,6 @@
 
 	&.error
 		color: #ff6b6b
-
-.genre-tabs
-	display: flex
-	gap: var(--sp-1)
-	flex-wrap: wrap
-
-.genre-tab
-	padding: var(--sp-1) var(--sp-4)
-	border: 1px solid var(--c-border)
-	background: transparent
-	color: var(--c-text-sub)
-	cursor: pointer
-	border-radius: var(--radius-sm)
-	font-size: var(--fs-sm)
-
-	&:hover
-		background: var(--c-overlay-2)
-
-	&.active
-		background: var(--c-overlay-3)
-		color: white
-		border-color: var(--c-accent-active)
 
 .novel-grid
 	display: flex

@@ -26,6 +26,10 @@ const nocturne = {
     }
   },
 
+  async fetchSearch(word: string) {
+    return fetchApi({ of: ['t', 'w', 'n', 'ga', 'nt'], word, lim: 20, order: 'hyoka' })
+  },
+
   async fetchDatum(id: string) {
     const data = await fetchApi({ of: ['n', 't', 'ga', 's', 'nu'], ncode: id })
     return toDatum(data[0])

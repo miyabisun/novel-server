@@ -66,6 +66,23 @@ const kakuyomu = {
     return { '総合': await kakuyomu.fetchRanking('all', period) }
   },
 
+  async fetchSearch(word: string) {
+    const res = await fetch(`https://kakuyomu.jp/search?q=${encodeURIComponent(word)}`, { headers })
+    if (!res.ok) throw new Error(`kakuyomu search error: ${res.status}`)
+    const apollo = parseApolloState(await res.text())
+    const results: Record<string, unknown>[] = []
+    for (const [key, val] of Object.entries(apollo)) {
+      if (!key.startsWith('Work:')) continue
+      const work = val as any
+      results.push({
+        id: key.replace('Work:', ''),
+        title: work.title as string,
+        page: (work.publicEpisodeCount ?? 0) as number,
+      })
+    }
+    return results
+  },
+
   async fetchWork(id: string) {
     const res = await fetch(`https://kakuyomu.jp/works/${id}`, { headers })
     if (!res.ok) throw new Error(`kakuyomu work error: ${res.status}`)
