@@ -137,7 +137,6 @@
 
 	$effect(() => {
 		loadPage(params.type, params.id, params.num);
-		document.querySelector('main')?.scrollTo(0, 0);
 	});
 
 	$effect(() => {
@@ -206,6 +205,7 @@
 	<div class="bar-right">
 		<span class="bar-page">{currentNum}{#if totalPages}/{totalPages}{/if}</span>
 		<button class="nav-btn" onclick={() => goTo(currentNum - 1)} disabled={!canGoPrev}>前</button>
+		<button class="toc-btn" onclick={() => navigate(`/novel/${params.type}/${params.id}/toc`)} disabled={totalPages <= 1}>目次</button>
 		<button class="nav-btn" onclick={() => goTo(currentNum + 1)} disabled={!canGoNext}>次</button>
 		{#if isFav}
 			<button class="fav-btn-remove" onclick={handleFavClick} disabled={favSaving || !title}>✕</button>
@@ -309,6 +309,22 @@
 	@media (max-width: 768px)
 		.bar-right > &
 			display: none
+
+.toc-btn
+	padding: var(--sp-1) var(--sp-3)
+	border: 1px solid var(--c-border-strong)
+	background: transparent
+	color: var(--c-text-sub)
+	cursor: pointer
+	border-radius: var(--radius-sm)
+	font-size: var(--fs-sm)
+
+	&:hover:not(:disabled)
+		background: var(--c-overlay-2)
+
+	&:disabled
+		opacity: 0.3
+		cursor: not-allowed
 
 .fav-btn
 	padding: var(--sp-1) var(--sp-3)

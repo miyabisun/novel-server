@@ -9,14 +9,21 @@
 	let episodes = $state([]);
 	let loading = $state(true);
 	let error = $state(null);
+	let currentRead = $state(0);
 
 	async function loadToc(type, id) {
 		loading = true;
 		error = null;
+		currentRead = 0;
 		try {
-			const data = await fetcher(`${config.path.api}/novel/${type}/${id}/toc`);
+			const [data, favorites] = await Promise.all([
+				fetcher(`${config.path.api}/novel/${type}/${id}/toc`),
+				fetcher(`${config.path.api}/favorites`).catch(() => []),
+			]);
 			title = decodeHtml(data.title || '');
 			episodes = data.episodes || [];
+			const fav = favorites.find((f) => f.type === type && f.id === id);
+			if (fav) currentRead = fav.read || 0;
 		} catch (e) {
 			error = e.message;
 		} finally {
@@ -60,7 +67,7 @@
 	{:else}
 		<div class="ep-list">
 			{#each episodes as ep (ep.num)}
-				<a class="ep-card" href={link(`/novel/${params.type}/${params.id}/${ep.num}`)}>
+				<a class="ep-card" class:current={ep.num === currentRead} href={link(`/novel/${params.type}/${params.id}/${ep.num}`)}>
 					<span class="ep-num">{ep.num}</span>
 					<span class="ep-title">{ep.title}</span>
 				</a>
@@ -121,6 +128,9 @@
 
 	&:hover
 		background: var(--c-surface-hover)
+
+	&.current
+		border-left: 3px solid var(--c-fav)
 
 .ep-num
 	flex-shrink: 0

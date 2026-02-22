@@ -45,12 +45,22 @@ function syncRoute() {
 	_params = result.params;
 }
 
+function scrollMainToTop() {
+	requestAnimationFrame(() => {
+		document.querySelector('main')?.scrollTo(0, 0);
+	});
+}
+
 export function navigate(path) {
 	history.pushState({}, '', getBasePath() + path);
 	syncRoute();
+	scrollMainToTop();
 }
 
-window.addEventListener('popstate', syncRoute);
+window.addEventListener('popstate', () => {
+	syncRoute();
+	scrollMainToTop();
+});
 
 // Initialize on load
 syncRoute();
