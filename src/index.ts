@@ -35,6 +35,10 @@ sub.use('/assets/*', serveStatic({
   root: './client/build',
   rewriteRequestPath: (p) => p.startsWith(basePath) ? p.slice(basePath.length) : p,
 }))
+sub.use('/favicon.svg', serveStatic({
+  root: './client/build',
+  rewriteRequestPath: () => '/favicon.svg',
+}))
 
 sub.get('*', (c) => {
   const html = getIndexHtml(basePath)
