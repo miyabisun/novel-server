@@ -43,6 +43,7 @@ bun start
 | `bun run build` | フロントエンドビルド |
 | `bun run build:client` | フロントエンドの依存インストール + ビルド |
 | `bun start` | 本番サーバー起動 |
+| `bun run test` | テスト実行 |
 
 ## 環境変数
 
@@ -65,4 +66,55 @@ DATABASE_PATH=./novel.db
 ```bash
 docker build -t novel-server .
 docker run -p 3000:3000 -v novel-data:/data novel-server
+```
+
+## リバースプロキシ
+
+### BASE_PATH なし（ルート配信）
+
+```nginx
+server {
+    listen 80;
+    server_name novels.example.com;
+
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}
+```
+
+### BASE_PATH あり（サブパス配信）
+
+`.env` で `BASE_PATH=/novels` を設定した上で:
+
+```nginx
+location /novels {
+    proxy_pass http://localhost:3000/novels;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+}
+```
+
+## SQLite 運用
+
+### Volume マウントの注意点
+
+SQLite は WAL モードで動作するため、DB ファイルと同じディレクトリに `*.db-wal` と `*.db-shm` が生成される。Volume マウントはファイル単位ではなくディレクトリ単位で行うこと。
+
+```bash
+# 正しい: ディレクトリをマウント
+docker run -v novel-data:/data novel-server
+
+# 誤り: ファイルだけマウントすると WAL/SHM が失われる
+docker run -v ./novel.db:/data/novel.db novel-server
+```
+
+### バックアップ
+
+稼働中のバックアップは SQLite の `.backup` コマンドを使う。ファイルコピーは WAL が未フラッシュの場合にデータ不整合を起こす可能性がある。
+
+```bash
+sqlite3 /data/novel.db ".backup /backup/novel-$(date +%Y%m%d).db"
 ```

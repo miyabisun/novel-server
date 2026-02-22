@@ -1,35 +1,12 @@
 import { Hono } from 'hono'
 import cache from '../lib/cache.js'
+import { sanitizeHtml } from '../lib/sanitize.js'
 import M from '../modules/index.js'
 
 const app = new Hono()
 
 const VALID_TYPES = Object.keys(M)
 const PAGE_TTL = 60 * 60 * 24 // 24 hours
-
-const ALLOWED_TAGS = new Set([
-  'p', 'br', 'hr', 'div', 'span',
-  'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-  'ruby', 'rt', 'rp', 'rb',
-  'em', 'strong', 'b', 'i', 'u', 's', 'sub', 'sup',
-])
-
-function sanitizeHtml(html: string | null): string {
-  if (!html) return ''
-  return new HTMLRewriter()
-    .on('*', {
-      element(el) {
-        if (ALLOWED_TAGS.has(el.tagName)) {
-          for (const [name] of el.attributes) {
-            el.removeAttribute(name)
-          }
-        } else {
-          el.removeAndKeepContent()
-        }
-      },
-    })
-    .transform(html)
-}
 
 app.get('/api/novel/:type/:id/pages/:num', async (c) => {
   const { type, id, num } = c.req.param()

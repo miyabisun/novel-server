@@ -5,10 +5,10 @@ export function mapItem(obj: Record<string, unknown>): Record<string, unknown> {
   for (const [key, val] of Object.entries(obj)) {
     switch (key) {
       case 'ncode':
-        acc['id'] = (val as string).toLowerCase()
+        acc['id'] = val != null ? String(val).toLowerCase() : val
         break
       case 'title':
-        acc[key] = (val as string).trim()
+        acc[key] = val != null ? String(val).trim() : val
         break
       case 'general_all_no':
         acc['page'] = val
@@ -49,7 +49,7 @@ export function parsePage(html: string, selector: string): string | null {
   const parts: string[] = []
   $(selector).each((_i, el) => {
     const h = $(el).html()
-    if (h) parts.push(h)
+    if (h?.trim()) parts.push(h)
   })
   return parts.length ? parts.join('<hr>') : null
 }
