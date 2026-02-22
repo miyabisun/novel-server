@@ -9,6 +9,7 @@ import pages from './routes/pages.js'
 import detail from './routes/detail.js'
 import favorites from './routes/favorites.js'
 import search from './routes/search.js'
+import toc from './routes/toc.js'
 import { getIndexHtml } from './lib/spa.js'
 
 const port = Number(process.env.PORT) || 3000
@@ -29,6 +30,7 @@ sub.route('/', pages)
 sub.route('/', detail)
 sub.route('/', favorites)
 sub.route('/', search)
+sub.route('/', toc)
 
 // Static files & SPA fallback
 sub.use('/assets/*', serveStatic({

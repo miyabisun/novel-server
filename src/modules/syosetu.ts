@@ -44,6 +44,19 @@ export function createFetchApi(apiUrl: string) {
   }
 }
 
+export function parseToc(html: string): { title: string; episodes: { num: number; title: string }[] } {
+  const $ = cheerio.load(html)
+  const title = $('.p-novel__title').first().text().trim() || $('title').first().text().trim()
+  const episodes: { num: number; title: string }[] = []
+  let num = 0
+  $('.p-eplist__sublist').each((_i, el) => {
+    num++
+    const epTitle = $(el).find('a').first().text().trim()
+    episodes.push({ num, title: epTitle })
+  })
+  return { title, episodes }
+}
+
 export function parsePage(html: string, selector: string): string | null {
   const $ = cheerio.load(html)
   const parts: string[] = []

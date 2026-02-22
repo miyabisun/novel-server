@@ -1,4 +1,4 @@
-import { createFetchApi, buildPages, parsePage } from './syosetu.js'
+import { createFetchApi, buildPages, parsePage, parseToc } from './syosetu.js'
 
 const type = 'narou'
 const fetchApi = createFetchApi('https://api.syosetu.com/novelapi/api/')
@@ -48,6 +48,12 @@ const narou = {
 
   async fetchSearch(word: string) {
     return fetchApi({ of: ['t', 'w', 'n', 'ga', 'nt'], word, lim: 20, order: 'hyoka' })
+  },
+
+  async fetchToc(ncode: string) {
+    const res = await fetch(`https://ncode.syosetu.com/${ncode}/`)
+    if (!res.ok) throw new Error(`narou toc error: ${res.status}`)
+    return parseToc(await res.text())
   },
 
   async fetchPage(ncode: string, page: string | number) {

@@ -89,6 +89,16 @@ const kakuyomu = {
     return parseApolloState(await res.text())
   },
 
+  async fetchToc(id: string) {
+    const apollo = await kakuyomu.fetchWork(id)
+    const work = extractWork(apollo, id)
+    const episodes = extractEpisodes(apollo, id)
+    return {
+      title: work.title,
+      episodes: episodes.map((ep) => ({ num: ep.num as number, title: ep.title as string })),
+    }
+  },
+
   async fetchDetail(id: string) {
     const apollo = await kakuyomu.fetchWork(id)
     const work = extractWork(apollo, id)

@@ -132,6 +132,49 @@
 
 ---
 
+## 目次 (Table of Contents)
+
+### GET `/api/novel/:type/:id/toc`
+
+小説の目次（全エピソード一覧）を取得します。キャッシュなし。外部サイトへの取得は最大 3 回リトライします（500ms × 試行回数のバックオフ）。
+
+narou / nocturne はトップページ（目次ページ）をスクレイピング、kakuyomu は Apollo State から抽出します。
+
+**パラメータ:**
+
+| 名前 | 型 | 説明 |
+|------|-----|------|
+| `type` | `string` | 対象サイト (`narou` / `kakuyomu` / `nocturne`) |
+| `id` | `string` | 小説 ID |
+
+**レスポンス (200):**
+
+```json
+{
+  "title": "小説タイトル",
+  "episodes": [
+    { "num": 1, "title": "第1話 タイトル" },
+    { "num": 2, "title": "第2話 タイトル" }
+  ]
+}
+```
+
+| フィールド | 型 | 説明 |
+|-----------|-----|------|
+| `title` | `string` | 小説タイトル |
+| `episodes` | `array` | エピソード一覧 |
+| `episodes[].num` | `number` | エピソード番号（1始まり） |
+| `episodes[].title` | `string` | エピソードタイトル |
+
+**エラー:**
+
+```json
+{ "error": "Invalid type" }                       // 400
+{ "error": "Failed to fetch table of contents" }   // 502
+```
+
+---
+
 ## ページ (Pages)
 
 ### GET `/api/novel/:type/:id/pages/:num`

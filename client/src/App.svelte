@@ -4,6 +4,7 @@
 	import Ranking from './pages/Ranking.svelte';
 	import Reader from './pages/Reader.svelte';
 	import Favorites from './pages/Favorites.svelte';
+	import TableOfContents from './pages/TableOfContents.svelte';
 
 	$effect(() => {
 		function handleClick(e) {
@@ -36,6 +37,8 @@
 		{:else if router.index === 1}
 			<Ranking type={router.params.type} />
 		{:else if router.index === 2}
+			<TableOfContents params={router.params} />
+		{:else if router.index === 3}
 			<Reader params={router.params} />
 		{/if}
 	</main>

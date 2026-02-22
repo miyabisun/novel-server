@@ -1,4 +1,4 @@
-import { createFetchApi, buildPages, parsePage } from './syosetu.js'
+import { createFetchApi, buildPages, parsePage, parseToc } from './syosetu.js'
 
 const type = 'nocturne'
 const fetchApi = createFetchApi('https://api.syosetu.com/novel18api/api/')
@@ -44,6 +44,14 @@ const nocturne = {
     const data = await fetchApi({ of: 't-s-ga', ncode: id })
     if (!data[0]) throw new Error('Novel not found')
     return { title: data[0].title as string, synopsis: (data[0].story as string) ?? '', page: (data[0].page as number) ?? 0 }
+  },
+
+  async fetchToc(ncode: string) {
+    const res = await fetch(`https://novel18.syosetu.com/${ncode}/`, {
+      headers: { Cookie: 'over18=yes' },
+    })
+    if (!res.ok) throw new Error(`nocturne toc error: ${res.status}`)
+    return parseToc(await res.text())
   },
 
   async fetchPage(ncode: string, page: string | number) {

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { mapItem, buildPages, parsePage } from './syosetu.js'
+import { mapItem, buildPages, parsePage, parseToc } from './syosetu.js'
 
 describe('mapItem', () => {
   test('maps ncode to lowercase id', () => {
@@ -99,5 +99,51 @@ describe('parsePage', () => {
     const html = '<div id="novel_honbun">   \n\t  </div>'
     const result = parsePage(html, '#novel_honbun')
     expect(result).toBeNull()
+  })
+})
+
+describe('parseToc', () => {
+  test('extracts title and episodes from TOC page', () => {
+    const html = `
+      <h1 class="p-novel__title">テスト小説</h1>
+      <div class="p-eplist__sublist"><a href="/n1234ab/1/">第1話 始まり</a></div>
+      <div class="p-eplist__sublist"><a href="/n1234ab/2/">第2話 展開</a></div>
+    `
+    const result = parseToc(html)
+    expect(result).toEqual({
+      title: 'テスト小説',
+      episodes: [
+        { num: 1, title: '第1話 始まり' },
+        { num: 2, title: '第2話 展開' },
+      ],
+    })
+  })
+
+  test('falls back to <title> when .p-novel__title is missing', () => {
+    const html = `
+      <html><head><title>フォールバックタイトル</title></head>
+      <body>
+        <div class="p-eplist__sublist"><a href="/n1234ab/1/">第1話</a></div>
+      </body></html>
+    `
+    const result = parseToc(html)
+    expect(result.title).toBe('フォールバックタイトル')
+    expect(result.episodes).toHaveLength(1)
+  })
+
+  test('returns empty episodes when no .p-eplist__sublist found', () => {
+    const html = '<h1 class="p-novel__title">短編小説</h1><div>本文</div>'
+    const result = parseToc(html)
+    expect(result).toEqual({ title: '短編小説', episodes: [] })
+  })
+
+  test('trims whitespace from title and episode titles', () => {
+    const html = `
+      <h1 class="p-novel__title">  スペース付き  </h1>
+      <div class="p-eplist__sublist"><a>  第1話  </a></div>
+    `
+    const result = parseToc(html)
+    expect(result.title).toBe('スペース付き')
+    expect(result.episodes[0].title).toBe('第1話')
   })
 })

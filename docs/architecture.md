@@ -26,6 +26,7 @@ novel-server/
 │       ├── favorites.ts        # お気に入り CRUD
 │       ├── ranking.ts          # ランキング API
 │       ├── search.ts           # 検索 API
+│       ├── toc.ts              # 目次 API
 │       └── pages.ts            # 小説本文 API
 ├── client/                     # フロントエンド（Svelte 5）
 │   ├── src/
@@ -40,9 +41,10 @@ novel-server/
 │   │   │       ├── Header.svelte
 │   │   │       └── NovelDetailModal.svelte
 │   │   └── pages/
-│   │       ├── Ranking.svelte  # ランキング一覧
-│   │       ├── Reader.svelte   # 小説リーダー
-│   │       └── Favorites.svelte # お気に入り一覧
+│   │       ├── Ranking.svelte          # ランキング一覧
+│   │       ├── Reader.svelte           # 小説リーダー
+│   │       ├── TableOfContents.svelte  # 目次
+│   │       └── Favorites.svelte        # お気に入り一覧
 │   └── build/                  # ビルド出力（git 管理外）
 ├── drizzle.config.ts           # Drizzle Kit 設定
 ├── Dockerfile                  # マルチステージビルド
@@ -68,6 +70,7 @@ novel-server/
 
 - `fetchRankingList(limit?, period?)` — ランキングデータを取得してジャンル別にグループ化（period: `daily` / `weekly` / `monthly` / `quarter` / `yearly`）
 - `fetchSearch(word)` — キーワードで小説を検索（最大 20 件、評価順）
+- `fetchToc(id)` — 小説の目次（全エピソードのタイトルと番号）を取得
 - `fetchDetail(id)` — 小説のタイトル・あらすじ・総ページ数を取得
 - `fetchPage(id, num)` — 小説の本文 HTML を取得
 - `fetchData(ids)` — 複数小説のメタデータを一括取得（同期用）
@@ -107,6 +110,7 @@ em, strong, b, i, u, s, sub, sup
 | 検索結果 | 1 時間 | 新作投稿を早めに反映するため短めの TTL |
 | 小説詳細 | 24 時間 | タイトル・あらすじは基本的に変わらない |
 | ページ本文 | 24 時間 | 小説の本文は基本的に変わらない |
+| 目次 | なし | リアルタイム性を重視（最新の話数を即時反映） |
 
 キャッシュの強制更新は各エンドポイントの `PATCH` メソッドで行えます。
 
@@ -118,7 +122,7 @@ em, strong, b, i, u, s, sub, sup
 
 | 層 | リトライ | 理由 |
 |----|---------|------|
-| ルートハンドラ（`detail.ts`, `pages.ts`） | 3 回 + 線形バックオフ（500ms × 試行回数） | ユーザーリクエストに対する応答品質を保証 |
+| ルートハンドラ（`detail.ts`, `pages.ts`, `toc.ts`） | 3 回 + 線形バックオフ（500ms × 試行回数） | ユーザーリクエストに対する応答品質を保証 |
 | スクレイピングモジュール（`modules/*.ts`） | なし | 単純な fetch に徹し、リトライ判断は呼び出し元に委ねる |
 | バックグラウンド同期（`favorite-sync.ts`） | なし（ループ継続で暗黙的リトライ） | 次の周期で自動的に再試行される |
 
@@ -198,7 +202,8 @@ DB パスは環境変数 `DATABASE_PATH` で指定します（デフォルト: `
 |-------|------|--------|
 | 0 | `/` | Favorites |
 | 1 | `/ranking/:type` | Ranking |
-| 2 | `/novel/:type/:id/:num` | Reader |
+| 2 | `/novel/:type/:id/toc` | TableOfContents |
+| 3 | `/novel/:type/:id/:num` | Reader |
 
 ### 状態管理
 

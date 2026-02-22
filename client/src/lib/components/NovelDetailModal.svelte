@@ -39,6 +39,11 @@
 		navigate(path);
 	}
 
+	function goToc() {
+		onclose();
+		navigate(`/novel/${type}/${novel.id}/toc`);
+	}
+
 	async function toggleFavorite() {
 		if (saving) return;
 		saving = true;
@@ -80,6 +85,7 @@
 
 		<div class="actions">
 			<button class="btn btn-primary" onclick={goRead}>第1話を読む</button>
+			<button class="btn btn-toc" onclick={goToc}>目次</button>
 			<button
 				class="btn btn-fav"
 				onclick={toggleFavorite}
@@ -174,6 +180,13 @@
 
 	&:hover
 		background: var(--c-accent-bg-hover)
+
+.btn-toc
+	background: transparent
+	color: var(--c-text-sub)
+
+	&:hover
+		background: var(--c-overlay-2)
 
 .btn-fav
 	background: transparent

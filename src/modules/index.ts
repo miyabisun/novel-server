@@ -7,6 +7,7 @@ interface NovelModule {
   fetchPage(id: string, pageId: string | number): Promise<string | null>
   fetchDetail(id: string): Promise<{ title: string; synopsis: string; page: number }>
   fetchSearch(word: string): Promise<Record<string, unknown>[]>
+  fetchToc(id: string): Promise<{ title: string; episodes: { num: number; title: string }[] }>
   fetchData(ids: string[]): Promise<Record<string, unknown>[]>
   fetchDatum(id: string): Promise<Record<string, unknown>>
 }
