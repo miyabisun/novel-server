@@ -2,11 +2,13 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-# Frontend build
-echo "==> Building frontend..."
+# Frontend setup & watch build (background)
+echo "==> Setting up frontend..."
 cd client
 npm install
 npx vite build
+echo "==> Starting frontend watch..."
+npx vite build --watch &
 cd ..
 
 # Rust build & run
