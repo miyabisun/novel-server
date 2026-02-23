@@ -17,12 +17,12 @@
   <path d="M140 110 h 232 a 16 16 0 0 1 16 16 v 280 a 16 16 0 0 1 -16 16 h -232 a 16 16 0 0 1 -16 -16 v -280 a 16 16 0 0 1 16 -16 z" fill="#FFFFFF"/>
   
   <!-- Spine -->
-  <path d="M140 110 h 48 v 312 h -48 a 16 16 0 0 1 -16 -16 v -280 a 16 16 0 0 1 16 -16 z" fill="#312E81"/>
-  
+  <path d="M140 110 h 48 v 312 h -48 a 16 16 0 0 1 -16 -16 v -280 a 16 16 0 0 1 16 -16 z" fill="#14532D"/>
+
   <!-- Decorative Lines on Spine -->
-  <rect x="124" y="160" width="64" height="6" fill="#4F46E5"/>
-  <rect x="124" y="252" width="64" height="6" fill="#4F46E5"/>
-  <rect x="124" y="344" width="64" height="6" fill="#4F46E5"/>
+  <rect x="124" y="160" width="64" height="6" fill="#166534"/>
+  <rect x="124" y="252" width="64" height="6" fill="#166534"/>
+  <rect x="124" y="344" width="64" height="6" fill="#166534"/>
   
   <!-- Book Cover Details (Title / Author lines) -->
   <rect x="220" y="160" width="100" height="24" rx="6" fill="#E5E7EB"/>
