@@ -2,6 +2,9 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+cleanup() { kill $VITE_PID 2>/dev/null || true; }
+trap cleanup EXIT
+
 # Frontend setup & watch build (background)
 echo "==> Setting up frontend..."
 cd client
@@ -9,6 +12,7 @@ npm install
 npx vite build
 echo "==> Starting frontend watch..."
 npx vite build --watch &
+VITE_PID=$!
 cd ..
 
 # Rust build & run
@@ -16,4 +20,4 @@ echo "==> Building server..."
 cargo build
 
 echo "==> Starting server..."
-exec target/debug/novel-server
+target/debug/novel-server
