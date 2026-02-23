@@ -1,8 +1,8 @@
-node_modules
+target
+bin
 client/node_modules
 client/build
 **/*.db
 *.md
-**/*.test.ts
 .git
 .env

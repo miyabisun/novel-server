@@ -1,29 +1,24 @@
-# Stage 1: Build
-FROM oven/bun:1 AS builder
+# Stage 1: Frontend build
+FROM node:22-slim AS frontend
+WORKDIR /app/client
+COPY client/package.json client/package-lock.json ./
+RUN npm ci
+COPY client/ .
+RUN npx vite build
+
+# Stage 2: Rust build
+FROM rust:1-slim AS backend
 WORKDIR /app
+COPY Cargo.toml Cargo.lock ./
+COPY src/ src/
+RUN cargo build --release
 
-# Server dependencies
-COPY package.json bun.lock ./
-RUN bun install --frozen-lockfile
-
-# Client build
-COPY client/package.json client/bun.lock ./client/
-RUN cd client && bun install --frozen-lockfile
-COPY client/ ./client/
-RUN cd client && bun run build
-
-# Assemble /dist
-RUN mkdir -p /dist/client && \
-    cp package.json bun.lock /dist/ && \
-    cp -r client/build /dist/client/
-COPY src/ /dist/src/
-RUN cd /dist && bun install --frozen-lockfile --production
-
-# Stage 2: Production runtime
-FROM oven/bun:1-slim
+# Stage 3: Production runtime
+FROM debian:bookworm-slim
+RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+COPY --from=backend /app/target/release/novel-server /usr/local/bin/
+COPY --from=frontend /app/client/build /app/client/build
 WORKDIR /app
-COPY --from=builder /dist ./
-ENV NODE_ENV=production
 ENV PORT=3000
 EXPOSE 3000
-CMD ["bun", "run", "src/index.ts"]
+CMD ["novel-server"]

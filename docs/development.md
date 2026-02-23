@@ -2,48 +2,50 @@
 
 ## 技術スタック
 
-- **バックエンド**: Bun + Hono + TypeScript + Drizzle ORM (SQLite)
+- **バックエンド**: Rust (axum + tokio + rusqlite)
 - **フロントエンド**: Svelte 5 + Vite + Sass
+
+## 前提条件
+
+- [Rust](https://rustup.rs/) (stable)
+- [Node.js](https://nodejs.org/) (フロントエンドビルド用)
 
 ## セットアップ
 
 ```bash
-bun run setup
+# フロントエンドの依存インストール + ビルド
+cd client && npm install && npx vite build && cd ..
+
+# .env を作成
+cp .env.example .env
 ```
-
-このコマンドで以下が実行されます:
-
-1. サーバー側の依存関係をインストール (`bun install`)
-2. クライアント側の依存関係をインストール (`cd client && bun install`)
-3. `.env` が存在しなければ `.env.example` からコピー
-
-`.env` を手動で作成する場合は `.env.example` を参考にしてください。
 
 ## 起動
 
 ```bash
-# 開発（フロントエンドのホットリビルド付き）
-bun run dev
+# 開発
+cargo run
 
-# 本番
-bun run build
-bun start
+# 本番（リリースビルド）
+cargo run --release
+
+# または bin/dev で一括ビルド＆起動
+bin/dev
 ```
 
 `http://localhost:3000` にアクセスするとアプリケーションが表示されます。
 
-> **注意:** `bun run dev` はフロントエンドの自動リビルド (vite --watch) のみ行います。サーバー側のコード (`src/`) を変更した場合は手動で再起動してください。
+> **注意:** フロントエンドの変更時は `cd client && npx vite build` でリビルドしてください。
 
 ## コマンド一覧
 
 | コマンド | 説明 |
 |---------|------|
-| `bun run setup` | 初期セットアップ（依存インストール + .env 生成） |
-| `bun run dev` | 開発サーバー起動（vite watch + bun） |
-| `bun run build` | フロントエンドビルド |
-| `bun run build:client` | フロントエンドの依存インストール + ビルド |
-| `bun start` | 本番サーバー起動 |
-| `bun run test` | テスト実行 |
+| `cd client && npm install && npx vite build` | フロントエンドセットアップ + ビルド |
+| `cargo run` | 開発サーバー起動 |
+| `cargo run --release` | 本番サーバー起動 |
+| `cargo build --release` | リリースビルド |
+| `cargo test` | テスト実行 |
 
 ## 環境変数
 

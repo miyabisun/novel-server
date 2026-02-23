@@ -4,30 +4,31 @@
 
 ```
 novel-server/
-├── src/                        # バックエンド（TypeScript）
-│   ├── index.ts                # エントリポイント、ミドルウェア設定
-│   ├── db/
-│   │   ├── index.ts            # Drizzle クライアント（bun:sqlite）
-│   │   └── schema.ts           # Drizzle スキーマ定義
-│   ├── lib/
-│   │   ├── cache.ts            # インメモリキャッシュ（Map + TTL）
-│   │   ├── favorite-sync.ts     # お気に入りバックグラウンド同期
-│   │   ├── init.ts             # 起動時スキーマ初期化（CREATE IF NOT EXISTS）
-│   │   ├── sanitize.ts         # HTML サニタイズ（許可タグリスト）
-│   │   └── spa.ts              # SPA 用 index.html 配信
+├── Cargo.toml                  # Rust プロジェクト定義
+├── src/                        # バックエンド（Rust）
+│   ├── main.rs                 # エントリポイント（axum + tokio::main）
+│   ├── config.rs               # 環境変数の読み込み
+│   ├── error.rs                # AppError enum + IntoResponse
+│   ├── state.rs                # AppState（db, cache, config, http）
+│   ├── db.rs                   # SQLite 初期化（rusqlite）
+│   ├── cache.rs                # インメモリキャッシュ（HashMap + TTL）
+│   ├── sanitize.rs             # HTML サニタイズ（ammonia）
+│   ├── spa.rs                  # SPA 用 index.html 配信
+│   ├── sync.rs                 # お気に入りバックグラウンド同期
 │   ├── modules/
-│   │   ├── index.ts            # モジュール集約
-│   │   ├── syosetu.ts          # なろう系共通ユーティリティ
-│   │   ├── narou.ts            # なろうスクレイピング
-│   │   ├── kakuyomu.ts         # カクヨムスクレイピング
-│   │   └── nocturne.ts         # ノクターンスクレイピング
+│   │   ├── mod.rs              # ModuleType enum + dispatch
+│   │   ├── syosetu.rs          # なろう系共通ユーティリティ
+│   │   ├── narou.rs            # なろうスクレイピング
+│   │   ├── kakuyomu.rs         # カクヨムスクレイピング
+│   │   └── nocturne.rs         # ノクターンスクレイピング
 │   └── routes/
-│       ├── detail.ts           # 小説詳細 API
-│       ├── favorites.ts        # お気に入り CRUD
-│       ├── ranking.ts          # ランキング API
-│       ├── search.ts           # 検索 API
-│       ├── toc.ts              # 目次 API
-│       └── pages.ts            # 小説本文 API
+│       ├── mod.rs              # ルーター組み立て
+│       ├── detail.rs           # 小説詳細 API
+│       ├── favorites.rs        # お気に入り CRUD
+│       ├── ranking.rs          # ランキング API
+│       ├── search.rs           # 検索 API
+│       ├── toc.rs              # 目次 API
+│       └── pages.rs            # 小説本文 API
 ├── client/                     # フロントエンド（Svelte 5）
 │   ├── src/
 │   │   ├── App.svelte          # ルートコンポーネント
@@ -46,19 +47,39 @@ novel-server/
 │   │       ├── TableOfContents.svelte  # 目次
 │   │       └── Favorites.svelte        # お気に入り一覧
 │   └── build/                  # ビルド出力（git 管理外）
-├── drizzle.config.ts           # Drizzle Kit 設定
 ├── Dockerfile                  # マルチステージビルド
-├── .env                        # 環境変数（DATABASE_PATH, PORT, BASE_PATH）
-└── package.json
+└── .env                        # 環境変数（DATABASE_PATH, PORT, BASE_PATH）
 ```
 
 ## バックエンド
+
+### 技術スタック
+
+| 用途 | ライブラリ |
+|------|-----------|
+| Web フレームワーク | axum + tokio |
+| データベース | rusqlite (bundled SQLite) |
+| HTML パース | scraper |
+| HTML サニタイズ | ammonia |
+| HTTP クライアント | reqwest |
+| 日時処理 | chrono |
+| 環境変数 | dotenvy |
+| シリアライズ | serde + serde_json |
+| ログ | tracing + tracing-subscriber |
+| エラー型 | thiserror |
+
+### 設計方針
+
+- **enum dispatch**: `ModuleType { Narou, Nocturne, Kakuyomu }` で 3 モジュールを切り替え。trait objects より単純で型安全。
+- **DB**: `Arc<Mutex<rusqlite::Connection>>` — SQLite は高速なので非同期プール不要。Mutex guard は `{}` ブロック内で完結させ `.await` を跨がない。
+- **Cache**: `Arc<Mutex<HashMap<String, CacheEntry>>>` — 最大 10k 件、serde_json::Value で異種データ格納。
+- **Background sync**: `tokio::spawn` + `tokio::time::interval`（narou/nocturne 10 分）、`tokio::time::sleep` チェーン（kakuyomu 動的間隔）。
 
 ### リクエスト処理の流れ
 
 ```
 リクエスト
-  → logger
+  → tracing logger
   → [basePath でルーティング]
   → ルートハンドラ
   → レスポンス
@@ -66,19 +87,19 @@ novel-server/
 
 ### スクレイピングモジュール
 
-`src/modules/` 内の各モジュールは以下のインターフェースを実装しています:
+`src/modules/` 内の各モジュールは `ModuleType` の enum dispatch により以下のメソッドを提供:
 
-- `fetchRankingList(limit?, period?)` — ランキングデータを取得してジャンル別にグループ化（period: `daily` / `weekly` / `monthly` / `quarter` / `yearly`）
-- `fetchSearch(word)` — キーワードで小説を検索（最大 20 件、評価順）
-- `fetchToc(id)` — 小説の目次（全エピソードのタイトルと番号）を取得
-- `fetchDetail(id)` — 小説のタイトル・あらすじ・総ページ数を取得
-- `fetchPage(id, num)` — 小説の本文 HTML を取得
-- `fetchData(ids)` — 複数小説のメタデータを一括取得（同期用）
-- `fetchDatum(id)` — 単一小説のメタデータを取得（同期用）
+- `fetch_ranking_list(limit, period)` — ランキングデータを取得してジャンル別にグループ化（period: `daily` / `weekly` / `monthly` / `quarter` / `yearly`）
+- `fetch_search(word)` — キーワードで小説を検索（最大 20 件、評価順）
+- `fetch_toc(id)` — 小説の目次（全エピソードのタイトルと番号）を取得
+- `fetch_detail(id)` — 小説のタイトル・あらすじ・総ページ数を取得
+- `fetch_page(id, num)` — 小説の本文 HTML を取得
+- `fetch_data(ids)` — 複数小説のメタデータを一括取得（同期用）
+- `fetch_datum(id)` — 単一小説のメタデータを取得（同期用）
 
 ### HTML サニタイズ
 
-`src/routes/pages.ts` では、スクレイピングモジュールが返す本文 HTML をサニタイズしてからクライアントに返しています。
+`src/sanitize.rs` では ammonia を使用し、スクレイピングモジュールが返す本文 HTML をサニタイズしてからクライアントに返しています。
 
 #### 許可タグ
 
@@ -90,19 +111,15 @@ em, strong, b, i, u, s, sub, sup
 ```
 
 - **許可タグ**: 全属性を削除した上でタグを保持
-- **非許可タグ**: タグを削除しテキストコンテンツのみ保持（`removeAndKeepContent()`）
+- **非許可タグ**: タグを削除しテキストコンテンツのみ保持
 
 #### 全属性を削除する理由
 
 スクレイピング元の HTML には `style`, `class`, `id` のような無害な属性に加え、`onclick`, `onerror` 等のイベントハンドラ属性が含まれる可能性がある。属性を個別に許可/拒否する方式は漏れのリスクがあるため、全属性を一律削除している。
 
-#### HTMLRewriter を選択した理由
-
-スクレイピングモジュール（`src/modules/`）が HTML パースに cheerio を使用しているのに対し、pages.ts では Bun 組み込みの `HTMLRewriter` を使用している。cheerio は DOM ツリーを構築するため CSS セレクタによる要素抽出に適しているが、サニタイズのように全要素を順次処理する用途ではストリーミングパーサーの `HTMLRewriter` の方がメモリ効率に優れる。また、Bun 組み込みのため追加依存が不要。
-
 ### キャッシュ戦略
 
-インメモリの Map ベースキャッシュを使用しています（`src/lib/cache.ts`）。
+インメモリの HashMap ベースキャッシュを使用しています（`src/cache.rs`）。
 
 | 対象 | TTL | 説明 |
 |------|-----|------|
@@ -122,28 +139,30 @@ em, strong, b, i, u, s, sub, sup
 
 | 層 | リトライ | 理由 |
 |----|---------|------|
-| ルートハンドラ（`detail.ts`, `pages.ts`, `toc.ts`） | 3 回 + 線形バックオフ（500ms × 試行回数） | ユーザーリクエストに対する応答品質を保証 |
-| スクレイピングモジュール（`modules/*.ts`） | なし | 単純な fetch に徹し、リトライ判断は呼び出し元に委ねる |
-| バックグラウンド同期（`favorite-sync.ts`） | なし（ループ継続で暗黙的リトライ） | 次の周期で自動的に再試行される |
+| ルートハンドラ（`routes/*.rs`） | 3 回 + 線形バックオフ（500ms × 試行回数） | ユーザーリクエストに対する応答品質を保証 |
+| スクレイピングモジュール（`modules/*.rs`） | なし | 単純な fetch に徹し、リトライ判断は呼び出し元に委ねる |
+| バックグラウンド同期（`sync.rs`） | なし（ループ継続で暗黙的リトライ） | 次の周期で自動的に再試行される |
 
 #### サイト構造変更への対応
 
-cheerio セレクタが空を返した場合、各モジュールは `null` または空配列を返す。現状は明示的な検知・通知機構はなく、サーバーログで確認する。
+scraper セレクタが空を返した場合、各モジュールは `None` または空配列を返す。現状は明示的な検知・通知機構はなく、サーバーログで確認する。
 
 ### バックグラウンド同期
 
-`src/lib/favorite-sync.ts` がお気に入りに登録された小説のメタデータ（タイトル・ページ数・更新日時）を定期的に同期します。
+`src/sync.rs` がお気に入りに登録された小説のメタデータ（タイトル・ページ数・更新日時）を定期的に同期します。
 
 | サイト | 方式 | 間隔 |
 |--------|------|------|
-| narou / nocturne | `fetchData` で全件一括取得 | 10 分 |
-| kakuyomu | `fetchDatum` で 1 件ずつラウンドロビン | 1 時間で全件を巡回 |
+| narou / nocturne | `fetch_data` で全件一括取得 | 10 分 |
+| kakuyomu | `fetch_datum` で 1 件ずつラウンドロビン | 1 時間で全件を巡回 |
 
-#### setInterval vs setTimeout の使い分け
+#### narou / nocturne（tokio::time::interval）
 
-**narou / nocturne（setInterval）**: なろう API は複数 ID を一括取得できるため、処理時間が短く安定している。固定間隔の `setInterval` で十分。
+なろう API は複数 ID を一括取得できるため、処理時間が短く安定している。固定間隔の interval で十分。
 
-**kakuyomu（setTimeout チェーン）**: HTML スクレイピングで 1 件ずつ取得するため、お気に入り件数に応じて間隔を動的に計算する必要がある。`setTimeout(tick, 3_600_000 / count)` で 1 時間かけて全件を均等に巡回する。
+#### kakuyomu（tokio::time::sleep チェーン）
+
+HTML スクレイピングで 1 件ずつ取得するため、お気に入り件数に応じて間隔を動的に計算する。`sleep(3_600_000ms / count)` で 1 時間かけて全件を均等に巡回する。
 
 #### スケーリング特性（kakuyomu）
 
@@ -157,12 +176,12 @@ cheerio セレクタが空を返した場合、各モジュールは `null` ま�
 
 #### エラー時の挙動
 
-- **narou / nocturne**: 例外をログして継続。`setInterval` は次の周期で自動再実行
-- **kakuyomu**: 例外をログし、60 秒待機後に `setTimeout` で再スケジュール
+- **narou / nocturne**: 例外をログして継続。interval は次の周期で自動再実行
+- **kakuyomu**: 例外をログし、60 秒待機後に sleep で再スケジュール
 
 ### データベース
 
-SQLite + Drizzle ORM を使用（`bun:sqlite` ネイティブドライバ）。起動時に `init.ts` が `CREATE TABLE IF NOT EXISTS` でスキーマを自動作成します。
+rusqlite (bundled SQLite) を使用。起動時に `db.rs` が `CREATE TABLE IF NOT EXISTS` でスキーマを自動作成します。
 
 DB パスは環境変数 `DATABASE_PATH` で指定します（デフォルト: `/data/novel.db`）。
 

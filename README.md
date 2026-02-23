@@ -13,11 +13,11 @@ docker run -p 3000:3000 -v novel-data:/data ghcr.io/miyabisun/novel-server:lates
 
 Open `http://localhost:3000` in your browser.
 
-## Quick Start (Bun)
+## Quick Start (Rust)
 
 ```bash
-bun run setup && bun run build:client
-bun start
+cd client && npm install && npx vite build && cd ..
+cargo run --release
 ```
 
 Open `http://localhost:3000` in your browser.

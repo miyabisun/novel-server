@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+# Frontend build
+echo "==> Building frontend..."
+cd client
+npm install
+npx vite build
+cd ..
+
+# Rust build & run
+echo "==> Building server..."
+cargo build
+
+echo "==> Starting server..."
+exec target/debug/novel-server

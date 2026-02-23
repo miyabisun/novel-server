@@ -3,51 +3,22 @@
 ## テストの実行
 
 ```bash
-bun test            # 全テスト実行
-bun test src/lib    # ディレクトリ指定
+cargo test         # 全テスト実行
 ```
 
-テストファイルはソースと同じディレクトリに `*.test.ts` として配置する。
+テストはソースファイル内に `#[cfg(test)] mod tests` として配置する。
 
 ## 方針
 
-純粋関数 > ビジネスロジック > ルートハンドラ の優先順位で、外部依存を持たないコードから着手する。
+純粋関数 > ビジネスロジック の優先順位で、外部依存を持たないコードから着手する。
 
-## DI パターンの適用
+## テスト対象
 
-現在のコードはモジュールスコープで `db` をインポートしているため、テスト時に in-memory SQLite に差し替えられない。テスト可能にするには **Core 関数 + 薄いラッパー** パターンを適用する。
+### 1. `modules/*.rs` — API レスポンス処理・パース
 
-```typescript
-// Before: テスト困難（db がモジュールスコープで固定）
-import { db } from '../db/index.js'
-export function syncFavorites() { db.select(...) }
+- `syosetu.rs`: `process_api_response()` — null/非オブジェクトのフィルタリング、`map_item()` のフィールド変換
+- `narou.rs` / `nocturne.rs`: `OF_*` 定数のフォーマット検証（ハイフン区切り、カンマ不使用）
 
-// After: テスト容易（db を外部から注入可能）
-// ※ 疑似コード。実際の型は BunSQLiteDatabase<typeof schema>
-export function syncFavoritesCore(deps: { db: DbClient }) { deps.db.select(...) }
-export function syncFavorites() { return syncFavoritesCore({ db }) }
-```
+### 2. `sanitize.rs` — HTML サニタイズ
 
-テスト側では in-memory SQLite で Drizzle インスタンスを生成し、Core 関数に渡す。
-
-## テスト対象の優先順位
-
-### 1. `modules/*.ts` — パース処理
-
-スクレイピング結果のパース（HTML → 構造化データ）はサイトの HTML 構造変更に対する回帰テストとして最も価値が高い。
-
-- `syosetu.ts`: `mapItem()`, `parsePage()`, `createFetchApi()` のレスポンスマッピング
-- `kakuyomu.ts`: Apollo State のパース、ページ HTML 抽出
-- `narou.ts` / `nocturne.ts`: `syosetu.ts` をベースとした差分のみ確認
-
-### 2. `routes/favorites.ts` — CRUD + 進捗更新
-
-upsert ロジック、ソート順（`novelupdated_at desc nulls last`）、進捗更新時の未登録チェック。DB 操作が中心のため DI パターン適用後にテスト。
-
-### 3. `lib/init.ts` — スキーマ冪等性
-
-`CREATE TABLE IF NOT EXISTS` の冪等性（2 回実行してもエラーにならないこと）と、`read` カラムのデフォルト値（0）の検証。
-
-### 4. `lib/sanitize.ts` — HTML サニタイズ
-
-許可タグリストに基づく `sanitizeHtml()` の動作確認。XSS ベクター（`<script>`, `<img onerror>` 等）が除去されることの検証。
+許可タグリストに基づくサニタイズの動作確認。XSS ベクター（`<script>`, `<img onerror>` 等）が除去されることの検証。
