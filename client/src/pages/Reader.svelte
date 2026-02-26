@@ -69,14 +69,16 @@
 		try {
 			const data = await fetcher(`${config.path.api}/novel/${type}/${id}/detail`);
 			title = decodeHtml(data.title || '');
-			totalPages = data.page || 0;
+			if (!totalPages) totalPages = data.page || 0;
 		} catch (e) { console.warn('loadDetail failed:', e) }
 	}
 
 	async function loadFavStatus(type, id) {
 		try {
 			const favorites = await fetcher(`${config.path.api}/favorites`);
-			isFav = favorites.some((f) => f.type === type && f.id === id);
+			const fav = favorites.find((f) => f.type === type && f.id === id);
+			isFav = !!fav;
+			if (fav) totalPages = fav.page || 0;
 		} catch { isFav = false; }
 	}
 
@@ -131,8 +133,8 @@
 	});
 
 	$effect(() => {
-		loadDetail(params.type, params.id);
 		loadFavStatus(params.type, params.id);
+		loadDetail(params.type, params.id);
 	});
 
 	$effect(() => {
