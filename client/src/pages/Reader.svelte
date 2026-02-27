@@ -269,7 +269,7 @@
 
 	&.top
 		position: sticky
-		top: 0
+		top: var(--header-h)
 
 .bar-title
 	color: var(--c-text-sub)

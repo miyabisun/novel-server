@@ -581,7 +581,7 @@
 @media (min-width: 800px)
 	.toolbar
 		position: sticky
-		top: 0
+		top: var(--header-h)
 		background: var(--c-bg)
 		z-index: 50
 		padding-top: var(--sp-4)

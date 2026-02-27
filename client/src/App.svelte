@@ -46,10 +46,5 @@
 
 <style lang="sass">
 .app
-	height: 100dvh
-	overflow: hidden
-
-main
-	height: calc(100dvh - var(--header-h))
-	overflow-y: auto
+	min-height: 100dvh
 </style>
