@@ -46,10 +46,10 @@
 
 <style lang="sass">
 .app
-	display: grid
-	grid-template-rows: auto 1fr
 	height: 100dvh
+	overflow: hidden
 
 main
+	height: calc(100dvh - var(--header-h))
 	overflow-y: auto
 </style>
