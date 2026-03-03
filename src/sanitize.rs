@@ -1,25 +1,29 @@
-use std::collections::HashSet;
+use ammonia::Builder;
+use std::collections::{HashMap, HashSet};
+use std::sync::LazyLock;
 
-pub fn clean(html: &str) -> String {
-    let mut allowed = HashSet::new();
-    for tag in &[
+static SANITIZER: LazyLock<Builder<'static>> = LazyLock::new(|| {
+    let allowed: HashSet<&str> = [
         "p", "br", "hr", "div", "span", "h1", "h2", "h3", "h4", "h5", "h6", "ruby", "rt", "rp",
         "rb", "em", "strong", "b", "i", "u", "s", "sub", "sup",
-    ] {
-        allowed.insert(*tag);
-    }
+    ]
+    .into_iter()
+    .collect();
 
-    ammonia::Builder::default()
+    let clean_content: HashSet<&str> = ["script", "style", "title", "noscript", "template"]
+        .into_iter()
+        .collect();
+
+    let mut builder = Builder::default();
+    builder
         .tags(allowed)
-        .clean_content_tags(
-            ["script", "style", "title", "noscript", "template"]
-                .iter()
-                .copied()
-                .collect(),
-        )
+        .clean_content_tags(clean_content)
         .generic_attributes(HashSet::new())
-        .tag_attributes(std::collections::HashMap::new())
-        .strip_comments(true)
-        .clean(html)
-        .to_string()
+        .tag_attributes(HashMap::new())
+        .strip_comments(true);
+    builder
+});
+
+pub fn clean(html: &str) -> String {
+    SANITIZER.clean(html).to_string()
 }

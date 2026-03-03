@@ -7,6 +7,17 @@ use axum::{Json, Router};
 use serde::Deserialize;
 use serde_json::{json, Value};
 
+fn map_favorite_row(row: &rusqlite::Row) -> rusqlite::Result<Value> {
+    Ok(json!({
+        "type": row.get::<_, String>(0)?,
+        "id": row.get::<_, String>(1)?,
+        "title": row.get::<_, String>(2)?,
+        "novelupdated_at": row.get::<_, Option<String>>(3)?,
+        "page": row.get::<_, i64>(4)?,
+        "read": row.get::<_, i64>(5)?,
+    }))
+}
+
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/api/favorites", get(get_favorites))
@@ -37,16 +48,7 @@ async fn get_favorites(State(state): State<AppState>) -> Result<Json<Value>, App
             "SELECT type, id, title, novelupdated_at, page, read FROM favorites ORDER BY novelupdated_at DESC NULLS LAST",
         )?;
         let rows = stmt
-            .query_map([], |row| {
-                Ok(json!({
-                    "type": row.get::<_, String>(0)?,
-                    "id": row.get::<_, String>(1)?,
-                    "title": row.get::<_, String>(2)?,
-                    "novelupdated_at": row.get::<_, Option<String>>(3)?,
-                    "page": row.get::<_, i64>(4)?,
-                    "read": row.get::<_, i64>(5)?,
-                }))
-            })?
+            .query_map([], map_favorite_row)?
             .collect::<Result<Vec<Value>, _>>()?;
         rows
     };
@@ -77,16 +79,7 @@ async fn put_favorite(
         let mut stmt = db.prepare(
             "SELECT type, id, title, novelupdated_at, page, read FROM favorites WHERE type = ?1 AND id = ?2",
         )?;
-        stmt.query_row(rusqlite::params![type_str, id], |row| {
-            Ok(json!({
-                "type": row.get::<_, String>(0)?,
-                "id": row.get::<_, String>(1)?,
-                "title": row.get::<_, String>(2)?,
-                "novelupdated_at": row.get::<_, Option<String>>(3)?,
-                "page": row.get::<_, i64>(4)?,
-                "read": row.get::<_, i64>(5)?,
-            }))
-        })?
+        stmt.query_row(rusqlite::params![type_str, id], map_favorite_row)?
     };
 
     // Fire-and-forget: fetch metadata immediately after adding
@@ -147,32 +140,17 @@ async fn patch_progress(
 
     let result = {
         let db = state.db.lock().unwrap();
-        // Check if exists
-        let exists: bool = db.query_row(
-            "SELECT COUNT(*) FROM favorites WHERE type = ?1 AND id = ?2",
-            rusqlite::params![type_str, id],
-            |row| row.get::<_, i64>(0).map(|c| c > 0),
-        )?;
-        if !exists {
-            return Ok(Json(json!({ "ok": true })));
-        }
-        db.execute(
+        let changes = db.execute(
             "UPDATE favorites SET read = ?1 WHERE type = ?2 AND id = ?3",
             rusqlite::params![read, type_str, id],
         )?;
+        if changes == 0 {
+            return Ok(Json(json!({ "ok": true })));
+        }
         let mut stmt = db.prepare(
             "SELECT type, id, title, novelupdated_at, page, read FROM favorites WHERE type = ?1 AND id = ?2",
         )?;
-        stmt.query_row(rusqlite::params![type_str, id], |row| {
-            Ok(json!({
-                "type": row.get::<_, String>(0)?,
-                "id": row.get::<_, String>(1)?,
-                "title": row.get::<_, String>(2)?,
-                "novelupdated_at": row.get::<_, Option<String>>(3)?,
-                "page": row.get::<_, i64>(4)?,
-                "read": row.get::<_, i64>(5)?,
-            }))
-        })?
+        stmt.query_row(rusqlite::params![type_str, id], map_favorite_row)?
     };
     Ok(Json(result))
 }

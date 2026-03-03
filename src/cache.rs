@@ -23,11 +23,10 @@ impl Cache {
     }
 
     pub fn get(&self, key: &str) -> Option<Value> {
-        let mut store = self.store.lock().unwrap();
+        let store = self.store.lock().unwrap();
         let entry = store.get(key)?;
         if let Some(expires_at) = entry.expires_at {
             if Instant::now() > expires_at {
-                store.remove(key);
                 return None;
             }
         }

@@ -23,20 +23,8 @@ async fn get_detail(
         return Ok(Json(cached));
     }
 
-    for i in 0..3u32 {
-        match module.fetch_detail(&state.http, &id).await {
-            Ok(detail) => {
-                state.cache.set(&key, detail.clone(), Some(DETAIL_TTL));
-                return Ok(Json(detail));
-            }
-            Err(e) => {
-                tracing::error!("fetchDetail {}/{} attempt {} failed: {}", type_str, id, i + 1, e);
-                if i < 2 {
-                    tokio::time::sleep(std::time::Duration::from_millis(500 * (i as u64 + 1)))
-                        .await;
-                }
-            }
-        }
-    }
-    Err(AppError::Upstream("Failed to fetch detail".into()))
+    let label = format!("fetchDetail {}/{}", type_str, id);
+    let detail = super::with_retry(&label, || module.fetch_detail(&state.http, &id)).await?;
+    state.cache.set(&key, detail.clone(), Some(DETAIL_TTL));
+    Ok(Json(detail))
 }

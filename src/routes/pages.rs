@@ -26,7 +26,7 @@ async fn get_page(
         return Ok(Json(json!({ "html": cached })));
     }
 
-    fetch_with_retry(&state, &module, &id, &num, &key).await
+    fetch_and_cache(&state, &module, &id, &num, &key).await
 }
 
 async fn patch_page(
@@ -36,33 +36,21 @@ async fn patch_page(
     let module = ModuleType::resolve(&type_str)?;
     let key = format!("novel:{}:{}:page:{}", type_str, id, num);
 
-    fetch_with_retry(&state, &module, &id, &num, &key).await
+    fetch_and_cache(&state, &module, &id, &num, &key).await
 }
 
-async fn fetch_with_retry(
+async fn fetch_and_cache(
     state: &AppState,
     module: &ModuleType,
     id: &str,
     num: &str,
     key: &str,
 ) -> Result<Json<Value>, AppError> {
-    for i in 0..3u32 {
-        match module.fetch_page(&state.http, id, num).await {
-            Ok(raw) => {
-                let html = sanitize::clean(raw.as_deref().unwrap_or(""));
-                state
-                    .cache
-                    .set(key, Value::String(html.clone()), Some(PAGE_TTL));
-                return Ok(Json(json!({ "html": html })));
-            }
-            Err(e) => {
-                tracing::error!("fetchPage {}/{}/{} attempt {} failed: {}", id, num, key, i + 1, e);
-                if i < 2 {
-                    tokio::time::sleep(std::time::Duration::from_millis(500 * (i as u64 + 1)))
-                        .await;
-                }
-            }
-        }
-    }
-    Err(AppError::Upstream("Failed to fetch page".into()))
+    let label = format!("fetchPage {}/{}/{}", id, num, key);
+    let raw = super::with_retry(&label, || module.fetch_page(&state.http, id, num)).await?;
+    let html = sanitize::clean(raw.as_deref().unwrap_or(""));
+    state
+        .cache
+        .set(key, Value::String(html.clone()), Some(PAGE_TTL));
+    Ok(Json(json!({ "html": html })))
 }

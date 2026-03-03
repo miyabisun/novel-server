@@ -27,22 +27,7 @@ async fn get_ranking(
     Path(type_str): Path<String>,
     Query(query): Query<RankingQuery>,
 ) -> Result<Json<Value>, AppError> {
-    let module = ModuleType::resolve(&type_str)?;
-    let period = query.period.as_deref().unwrap_or("daily");
-    validate_period(&type_str, period)?;
-
-    let key = format!("novel:{}:ranking:{}", type_str, period);
-
-    if let Some(cached) = state.cache.get(&key) {
-        return Ok(Json(cached));
-    }
-
-    let ranking = module
-        .fetch_ranking_list(&state.http, 100, period)
-        .await
-        .map_err(|_| AppError::Upstream("Failed to fetch ranking".into()))?;
-    state.cache.set(&key, ranking.clone(), Some(RANKING_TTL));
-    Ok(Json(ranking))
+    fetch_ranking(state, &type_str, query.period.as_deref(), true).await
 }
 
 async fn patch_ranking(
@@ -50,11 +35,26 @@ async fn patch_ranking(
     Path(type_str): Path<String>,
     Query(query): Query<RankingQuery>,
 ) -> Result<Json<Value>, AppError> {
-    let module = ModuleType::resolve(&type_str)?;
-    let period = query.period.as_deref().unwrap_or("daily");
-    validate_period(&type_str, period)?;
+    fetch_ranking(state, &type_str, query.period.as_deref(), false).await
+}
+
+async fn fetch_ranking(
+    state: AppState,
+    type_str: &str,
+    period: Option<&str>,
+    use_cache: bool,
+) -> Result<Json<Value>, AppError> {
+    let module = ModuleType::resolve(type_str)?;
+    let period = period.unwrap_or("daily");
+    validate_period(type_str, period)?;
 
     let key = format!("novel:{}:ranking:{}", type_str, period);
+
+    if use_cache {
+        if let Some(cached) = state.cache.get(&key) {
+            return Ok(Json(cached));
+        }
+    }
 
     let ranking = module
         .fetch_ranking_list(&state.http, 100, period)

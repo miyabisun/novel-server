@@ -42,66 +42,23 @@ pub fn update_favorite_from_datum(
     datum: &Value,
 ) {
     let id = datum["id"].as_str().unwrap_or_default();
-    let title = datum["title"].as_str().map(|s| s.to_string());
+    let title = datum["title"].as_str();
     let page = datum["pages"].as_array().map(|a| a.len() as i64);
-    let novelupdated_at = datum["novelupdated_at"].as_str().map(|s| s.to_string());
+    let novelupdated_at = datum["novelupdated_at"].as_str();
 
-    let conn = db.lock().unwrap();
-    // Build dynamic UPDATE
-    let mut sets = Vec::new();
-    let mut param_idx = 1u32;
-    let mut title_idx = 0u32;
-    let mut page_idx = 0u32;
-    let mut nua_idx = 0u32;
-
-    if title.is_some() {
-        title_idx = param_idx;
-        sets.push(format!("title = ?{}", param_idx));
-        param_idx += 1;
-    }
-    if page.is_some() {
-        page_idx = param_idx;
-        sets.push(format!("page = ?{}", param_idx));
-        param_idx += 1;
-    }
-    if novelupdated_at.is_some() {
-        nua_idx = param_idx;
-        sets.push(format!("novelupdated_at = ?{}", param_idx));
-        param_idx += 1;
-    }
-
-    if sets.is_empty() {
+    if title.is_none() && page.is_none() && novelupdated_at.is_none() {
         return;
     }
 
-    let sql = format!(
-        "UPDATE favorites SET {} WHERE type = ?{} AND id = ?{}",
-        sets.join(", "),
-        param_idx,
-        param_idx + 1
+    let conn = db.lock().unwrap();
+    let _ = conn.execute(
+        "UPDATE favorites SET
+            title = COALESCE(?1, title),
+            page = COALESCE(?2, page),
+            novelupdated_at = COALESCE(?3, novelupdated_at)
+         WHERE type = ?4 AND id = ?5",
+        rusqlite::params![title, page, novelupdated_at, type_str, id],
     );
-
-    // Build params vector with concrete types using rusqlite::types::Value
-    let mut params: Vec<rusqlite::types::Value> = Vec::new();
-    // Fill in order of param_idx
-    let total = param_idx + 1; // last idx for id
-    for i in 1..=total {
-        if i == title_idx {
-            params.push(rusqlite::types::Value::Text(title.clone().unwrap()));
-        } else if i == page_idx {
-            params.push(rusqlite::types::Value::Integer(page.unwrap()));
-        } else if i == nua_idx {
-            params.push(rusqlite::types::Value::Text(novelupdated_at.clone().unwrap()));
-        } else if i == param_idx {
-            params.push(rusqlite::types::Value::Text(type_str.to_string()));
-        } else if i == param_idx + 1 {
-            params.push(rusqlite::types::Value::Text(id.to_string()));
-        }
-    }
-
-    let param_refs: Vec<&dyn rusqlite::types::ToSql> =
-        params.iter().map(|p| p as &dyn rusqlite::types::ToSql).collect();
-    let _ = conn.execute(&sql, param_refs.as_slice());
 }
 
 fn start_syosetu_sync(state: AppState, module: ModuleType, interval: Duration) {

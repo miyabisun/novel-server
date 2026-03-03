@@ -23,15 +23,13 @@ async fn get_search(
     Path(type_str): Path<String>,
     Query(query): Query<SearchQuery>,
 ) -> Result<Json<Value>, AppError> {
-    ModuleType::resolve(&type_str)?;
+    let module = ModuleType::resolve(&type_str)?;
     let q = query
         .q
         .as_deref()
         .map(|s| s.trim())
         .filter(|s| !s.is_empty())
         .ok_or_else(|| AppError::BadRequest("Missing query parameter: q".into()))?;
-
-    let module = ModuleType::resolve(&type_str)?;
     let key = format!("novel:{}:search:{}", type_str, q);
 
     if let Some(cached) = state.cache.get(&key) {
