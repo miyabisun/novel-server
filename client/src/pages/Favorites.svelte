@@ -3,12 +3,8 @@
 	import fetcher from '$lib/fetcher.js';
 	import { link } from '$lib/router.svelte.js';
 	import { decodeHtml } from '$lib/decode.js';
-
-	const typeColors = {
-		narou: 'rgba(100, 190, 120, 0.7)',
-		kakuyomu: 'rgba(100, 160, 220, 0.7)',
-		nocturne: 'rgba(200, 110, 110, 0.7)',
-	};
+	import ConfirmModal from '$lib/components/ConfirmModal.svelte';
+	import { typeColors } from '$lib/constants.js';
 
 	let favorites = $state([]);
 	let loading = $state(false);
@@ -53,13 +49,6 @@
 		}
 	}
 
-	function handleKeydown(e) {
-		if (deleteTarget && e.key === 'Escape') cancelDelete();
-	}
-
-	function handleBackdrop(e) {
-		if (e.target === e.currentTarget) cancelDelete();
-	}
 
 	// Swipe action for touch devices
 	function swipeable(node, opts) {
@@ -120,12 +109,14 @@
 		node.addEventListener('touchstart', onStart, { passive: true });
 		node.addEventListener('touchmove', onMove, { passive: false });
 		node.addEventListener('touchend', onEnd, { passive: true });
+		node.addEventListener('touchcancel', onEnd, { passive: true });
 
 		return {
 			destroy() {
 				node.removeEventListener('touchstart', onStart);
 				node.removeEventListener('touchmove', onMove);
 				node.removeEventListener('touchend', onEnd);
+				node.removeEventListener('touchcancel', onEnd);
 			},
 		};
 	}
@@ -137,8 +128,6 @@
 
 	loadFavorites();
 </script>
-
-<svelte:window onkeydown={handleKeydown} />
 
 <div class="favorites">
 	{#if loading}
@@ -174,17 +163,11 @@
 </div>
 
 {#if deleteTarget}
-	<!-- svelte-ignore a11y_click_events_have_key_events -->
-	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<div class="backdrop" onclick={handleBackdrop}>
-		<div class="modal">
-			<p class="modal-message">「{decodeHtml(deleteTarget.title)}」を削除しますか？</p>
-			<div class="modal-actions">
-				<button class="btn btn-cancel" onclick={cancelDelete}>キャンセル</button>
-				<button class="btn btn-delete" onclick={executeDelete}>削除</button>
-			</div>
-		</div>
-	</div>
+	<ConfirmModal
+		message={`「${decodeHtml(deleteTarget.title)}」を削除しますか？`}
+		onconfirm={executeDelete}
+		oncancel={cancelDelete}
+	/>
 {/if}
 
 <style lang="sass">
@@ -271,67 +254,6 @@
 
 	&:hover
 		background: var(--c-danger-hover)
-
-.status
-	text-align: center
-	padding: var(--sp-5)
-	color: var(--c-text-sub)
-
-	&.error
-		color: #ff6b6b
-
-// Delete confirmation modal
-.backdrop
-	position: fixed
-	inset: 0
-	background: var(--c-backdrop)
-	z-index: 200
-	display: flex
-	align-items: center
-	justify-content: center
-	padding: var(--sp-5)
-
-.modal
-	background: var(--c-surface)
-	border: 1px solid var(--c-border-strong)
-	border-radius: var(--radius-lg)
-	padding: var(--sp-5)
-	max-width: 360px
-	width: 100%
-
-.modal-message
-	margin: 0 0 var(--sp-5)
-	font-size: var(--fs-md)
-	color: var(--c-text)
-	line-height: 1.6
-	overflow-wrap: break-word
-
-.modal-actions
-	display: flex
-	gap: var(--sp-3)
-	justify-content: flex-end
-
-.btn
-	padding: var(--sp-3) var(--sp-4)
-	border: 1px solid var(--c-border-strong)
-	border-radius: var(--radius-sm)
-	cursor: pointer
-	font-size: var(--fs-sm)
-
-.btn-cancel
-	background: transparent
-	color: var(--c-text-sub)
-
-	&:hover
-		background: var(--c-overlay-2)
-
-.btn-delete
-	background: var(--c-danger-bg)
-	color: var(--c-danger)
-	border-color: var(--c-danger-border)
-
-	&:hover
-		background: var(--c-danger-bg-hover)
 
 // Mobile: swipe-to-delete
 @media (max-width: 799px)

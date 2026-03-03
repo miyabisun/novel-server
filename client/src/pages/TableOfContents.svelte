@@ -91,14 +91,6 @@
 	color: white
 	line-height: 1.4
 
-.status
-	text-align: center
-	padding: var(--sp-5)
-	color: var(--c-text-sub)
-
-	&.error
-		color: #ff6b6b
-
 .retry-btn
 	padding: var(--sp-2) var(--sp-4)
 	border: 1px solid var(--c-border-strong)

@@ -3,6 +3,7 @@
 	import fetcher from '$lib/fetcher.js';
 	import { navigate } from '$lib/router.svelte.js';
 	import { decodeHtml } from '$lib/decode.js';
+	import ConfirmModal from '$lib/components/ConfirmModal.svelte';
 
 	let { params } = $props();
 	let html = $state('');
@@ -41,10 +42,7 @@
 	}
 
 	function handleKeydown(e) {
-		if (showUnfavConfirm) {
-			if (e.key === 'Escape') showUnfavConfirm = false;
-			return;
-		}
+		if (showUnfavConfirm) return;
 		if (e.key === 'ArrowLeft') {
 			e.preventDefault();
 			goTo(currentNum - 1);
@@ -58,28 +56,32 @@
 	}
 
 	function updateProgress(type, id, num) {
-		fetch(`${config.path.api}/favorites/${type}/${id}/progress`, {
+		if (!isFav) return;
+		fetcher(`${config.path.api}/favorites/${type}/${id}/progress`, {
 			method: 'PATCH',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ read: Number(num) }),
 		}).catch(() => {});
 	}
 
-	async function loadDetail(type, id) {
-		try {
-			const data = await fetcher(`${config.path.api}/novel/${type}/${id}/detail`);
-			title = decodeHtml(data.title || '');
-			if (!totalPages) totalPages = data.page || 0;
-		} catch (e) { console.warn('loadDetail failed:', e) }
-	}
-
-	async function loadFavStatus(type, id) {
-		try {
-			const favorites = await fetcher(`${config.path.api}/favorites`);
-			const fav = favorites.find((f) => f.type === type && f.id === id);
+	async function loadMeta(type, id) {
+		const [detailResult, favResult] = await Promise.allSettled([
+			fetcher(`${config.path.api}/novel/${type}/${id}/detail`),
+			fetcher(`${config.path.api}/favorites`),
+		]);
+		if (detailResult.status === 'fulfilled') {
+			title = decodeHtml(detailResult.value.title || '');
+		}
+		if (favResult.status === 'fulfilled') {
+			const fav = favResult.value.find((f) => f.type === type && f.id === id);
 			isFav = !!fav;
-			if (fav) totalPages = fav.page || 0;
-		} catch { isFav = false; }
+			totalPages = fav?.page || (detailResult.status === 'fulfilled' ? detailResult.value.page : 0) || 0;
+		} else {
+			isFav = false;
+			if (detailResult.status === 'fulfilled') {
+				totalPages = detailResult.value.page || 0;
+			}
+		}
 	}
 
 	function handleFavClick() {
@@ -121,9 +123,6 @@
 		}
 	}
 
-	function handleBackdrop(e) {
-		if (e.target === e.currentTarget) showUnfavConfirm = false;
-	}
 
 	$effect(() => {
 		document.title = title
@@ -133,8 +132,7 @@
 	});
 
 	$effect(() => {
-		loadFavStatus(params.type, params.id);
-		loadDetail(params.type, params.id);
+		loadMeta(params.type, params.id);
 	});
 
 	$effect(() => {
@@ -146,10 +144,7 @@
 		return () => window.removeEventListener('keydown', handleKeydown);
 	});
 
-	$effect(() => {
-		const node = document.querySelector('.reader');
-		if (!node) return;
-
+	function readerSwipe(node) {
 		let startX, startY, locked, horizontal;
 
 		function onStart(e) {
@@ -194,12 +189,14 @@
 		node.addEventListener('touchmove', onMove, { passive: false });
 		node.addEventListener('touchend', onEnd, { passive: true });
 
-		return () => {
-			node.removeEventListener('touchstart', onStart);
-			node.removeEventListener('touchmove', onMove);
-			node.removeEventListener('touchend', onEnd);
+		return {
+			destroy() {
+				node.removeEventListener('touchstart', onStart);
+				node.removeEventListener('touchmove', onMove);
+				node.removeEventListener('touchend', onEnd);
+			},
 		};
-	});
+	}
 </script>
 
 <nav class="reader-bar top">
@@ -224,7 +221,7 @@
 	<div class="swipe-hint right" class:ready={swipeReady} class:disabled={!canGoNext}>{#if canGoNext}次へ ›{:else}<del>次へ ›</del>{/if}</div>
 {/if}
 
-<div class="reader">
+<div class="reader" use:readerSwipe>
 	{#if loading}
 		<p class="status">読み込み中...</p>
 	{:else if error}
@@ -238,17 +235,11 @@
 </div>
 
 {#if showUnfavConfirm}
-	<!-- svelte-ignore a11y_click_events_have_key_events -->
-	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<div class="backdrop" onclick={handleBackdrop}>
-		<div class="modal">
-			<p class="modal-message">「{title}」をお気に入りから削除しますか？</p>
-			<div class="modal-actions">
-				<button class="btn btn-cancel" onclick={() => showUnfavConfirm = false}>キャンセル</button>
-				<button class="btn btn-delete" onclick={executeUnfav}>削除</button>
-			</div>
-		</div>
-	</div>
+	<ConfirmModal
+		message={`「${title}」をお気に入りから削除しますか？`}
+		onconfirm={executeUnfav}
+		oncancel={() => showUnfavConfirm = false}
+	/>
 {/if}
 
 <style lang="sass">
@@ -360,14 +351,6 @@
 		cursor: default
 		opacity: 0.7
 
-.status
-	text-align: center
-	padding: var(--sp-6)
-	color: var(--c-text-sub)
-
-	&.error
-		color: #ff6b6b
-
 .content
 	padding: var(--sp-4) 0
 	line-height: 2
@@ -404,57 +387,5 @@
 
 	&.disabled
 		color: rgba(255, 255, 255, 0.55)
-
-.backdrop
-	position: fixed
-	inset: 0
-	background: var(--c-backdrop)
-	z-index: 200
-	display: flex
-	align-items: center
-	justify-content: center
-	padding: var(--sp-5)
-
-.modal
-	background: var(--c-surface)
-	border: 1px solid var(--c-border-strong)
-	border-radius: var(--radius-lg)
-	padding: var(--sp-5)
-	max-width: 360px
-	width: 100%
-
-.modal-message
-	margin: 0 0 var(--sp-5)
-	font-size: var(--fs-md)
-	color: var(--c-text)
-	line-height: 1.6
-	overflow-wrap: break-word
-
-.modal-actions
-	display: flex
-	gap: var(--sp-3)
-	justify-content: flex-end
-
-.btn
-	padding: var(--sp-3) var(--sp-4)
-	border: 1px solid var(--c-border-strong)
-	border-radius: var(--radius-sm)
-	cursor: pointer
-	font-size: var(--fs-sm)
-
-.btn-cancel
-	background: transparent
-	color: var(--c-text-sub)
-
-	&:hover
-		background: var(--c-overlay-2)
-
-.btn-delete
-	background: var(--c-danger-bg)
-	color: var(--c-danger)
-	border-color: var(--c-danger-border)
-
-	&:hover
-		background: var(--c-danger-bg-hover)
 
 </style>

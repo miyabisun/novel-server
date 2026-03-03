@@ -145,14 +145,6 @@
 	color: white
 	padding-right: 30px
 
-.status
-	color: var(--c-text-sub)
-	text-align: center
-	padding: var(--sp-5) 0
-
-	&.error
-		color: #ff6b6b
-
 .synopsis
 	white-space: pre-wrap
 	color: var(--c-text)

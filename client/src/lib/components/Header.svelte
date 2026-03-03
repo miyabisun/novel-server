@@ -1,11 +1,12 @@
 <script>
 	import { router, link } from '$lib/router.svelte.js';
+	import { typeColors } from '$lib/constants.js';
 
 	const navItems = [
 		{ label: 'favorite', href: '/', color: 'rgba(220, 180, 50, 0.7)' },
-		{ label: 'narou', href: '/ranking/narou', color: 'rgba(100, 190, 120, 0.7)' },
-		{ label: 'kakuyomu', href: '/ranking/kakuyomu', color: 'rgba(100, 160, 220, 0.7)' },
-		{ label: 'nocturne', href: '/ranking/nocturne', color: 'rgba(200, 110, 110, 0.7)' },
+		{ label: 'narou', href: '/ranking/narou', color: typeColors.narou },
+		{ label: 'kakuyomu', href: '/ranking/kakuyomu', color: typeColors.kakuyomu },
+		{ label: 'nocturne', href: '/ranking/nocturne', color: typeColors.nocturne },
 	];
 
 	function isActive(item) {
