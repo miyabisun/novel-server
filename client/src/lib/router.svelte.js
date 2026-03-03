@@ -47,7 +47,7 @@ function syncRoute() {
 
 function scrollMainToTop() {
 	requestAnimationFrame(() => {
-		document.querySelector('main')?.scrollTo(0, 0);
+		window.scrollTo(0, 0);
 	});
 }
 
