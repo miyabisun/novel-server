@@ -1,6 +1,4 @@
 pub mod kakuyomu;
-pub mod narou;
-pub mod nocturne;
 pub mod syosetu;
 
 use crate::error::AppError;
@@ -38,8 +36,8 @@ impl ModuleType {
         period: &str,
     ) -> Result<Value, AppError> {
         match self {
-            Self::Narou => narou::fetch_ranking_list(client, limit, period).await,
-            Self::Nocturne => nocturne::fetch_ranking_list(client, limit, period).await,
+            Self::Narou => syosetu::fetch_ranking_list(&syosetu::NAROU, client, limit, period).await,
+            Self::Nocturne => syosetu::fetch_ranking_list(&syosetu::NOCTURNE, client, limit, period).await,
             Self::Kakuyomu => kakuyomu::fetch_ranking_list(client, period).await,
         }
     }
@@ -51,8 +49,8 @@ impl ModuleType {
         page_id: &str,
     ) -> Result<Option<String>, AppError> {
         match self {
-            Self::Narou => narou::fetch_page(client, id, page_id).await,
-            Self::Nocturne => nocturne::fetch_page(client, id, page_id).await,
+            Self::Narou => syosetu::fetch_page(&syosetu::NAROU, client, id, page_id).await,
+            Self::Nocturne => syosetu::fetch_page(&syosetu::NOCTURNE, client, id, page_id).await,
             Self::Kakuyomu => kakuyomu::fetch_page(client, id, page_id).await,
         }
     }
@@ -63,8 +61,8 @@ impl ModuleType {
         id: &str,
     ) -> Result<Value, AppError> {
         match self {
-            Self::Narou => narou::fetch_detail(client, id).await,
-            Self::Nocturne => nocturne::fetch_detail(client, id).await,
+            Self::Narou => syosetu::fetch_detail(&syosetu::NAROU, client, id).await,
+            Self::Nocturne => syosetu::fetch_detail(&syosetu::NOCTURNE, client, id).await,
             Self::Kakuyomu => kakuyomu::fetch_detail(client, id).await,
         }
     }
@@ -75,8 +73,8 @@ impl ModuleType {
         word: &str,
     ) -> Result<Value, AppError> {
         match self {
-            Self::Narou => narou::fetch_search(client, word).await,
-            Self::Nocturne => nocturne::fetch_search(client, word).await,
+            Self::Narou => syosetu::fetch_search(&syosetu::NAROU, client, word).await,
+            Self::Nocturne => syosetu::fetch_search(&syosetu::NOCTURNE, client, word).await,
             Self::Kakuyomu => kakuyomu::fetch_search(client, word).await,
         }
     }
@@ -87,8 +85,8 @@ impl ModuleType {
         id: &str,
     ) -> Result<Value, AppError> {
         match self {
-            Self::Narou => narou::fetch_toc(client, id).await,
-            Self::Nocturne => nocturne::fetch_toc(client, id).await,
+            Self::Narou => syosetu::fetch_toc(&syosetu::NAROU, client, id).await,
+            Self::Nocturne => syosetu::fetch_toc(&syosetu::NOCTURNE, client, id).await,
             Self::Kakuyomu => kakuyomu::fetch_toc(client, id).await,
         }
     }
@@ -99,8 +97,8 @@ impl ModuleType {
         ids: &[String],
     ) -> Result<Vec<Value>, AppError> {
         match self {
-            Self::Narou => narou::fetch_data(client, ids).await,
-            Self::Nocturne => nocturne::fetch_data(client, ids).await,
+            Self::Narou => syosetu::fetch_data(&syosetu::NAROU, client, ids).await,
+            Self::Nocturne => syosetu::fetch_data(&syosetu::NOCTURNE, client, ids).await,
             Self::Kakuyomu => kakuyomu::fetch_data(client, ids).await,
         }
     }
@@ -111,8 +109,8 @@ impl ModuleType {
         id: &str,
     ) -> Result<Value, AppError> {
         match self {
-            Self::Narou => narou::fetch_datum(client, id).await,
-            Self::Nocturne => nocturne::fetch_datum(client, id).await,
+            Self::Narou => syosetu::fetch_datum(&syosetu::NAROU, client, id).await,
+            Self::Nocturne => syosetu::fetch_datum(&syosetu::NOCTURNE, client, id).await,
             Self::Kakuyomu => kakuyomu::fetch_datum(client, id).await,
         }
     }

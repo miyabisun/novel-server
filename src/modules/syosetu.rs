@@ -1,4 +1,5 @@
 use crate::error::AppError;
+use reqwest::header::{HeaderMap, HeaderValue, COOKIE};
 use scraper::{Html, Selector};
 use serde_json::{json, Map, Value};
 
@@ -176,6 +177,305 @@ pub struct TocEpisode {
     pub title: String,
 }
 
+// ── Site-specific configuration and functions ──
+
+pub struct SyosetuSite {
+    pub api_url: &'static str,
+    pub base_url: &'static str,
+    pub type_str: &'static str,
+    pub genre_param: &'static str,
+    pub ranking_genres: &'static [(&'static str, u32)],
+    pub over18: bool,
+}
+
+pub static NAROU: SyosetuSite = SyosetuSite {
+    api_url: "https://api.syosetu.com/novelapi/api/",
+    base_url: "https://ncode.syosetu.com",
+    type_str: "narou",
+    genre_param: "genre",
+    ranking_genres: &[
+        ("異世界 [恋愛]", 101),
+        ("現実世界 [恋愛]", 102),
+        ("ハイファンタジー", 201),
+        ("ローファンタジー", 202),
+        ("アクション", 306),
+    ],
+    over18: false,
+};
+
+pub static NOCTURNE: SyosetuSite = SyosetuSite {
+    api_url: "https://api.syosetu.com/novel18api/api/",
+    base_url: "https://novel18.syosetu.com",
+    type_str: "nocturne",
+    genre_param: "nocgenre",
+    ranking_genres: &[("ノクターン", 1)],
+    over18: true,
+};
+
+/// Output fields for ranking/search (title, writer, ncode, general_all_no, noveltype)
+const OF_RANKING: &str = "t-w-n-ga-nt";
+/// Output fields for datum/data (ncode, title, general_all_no, story, novelupdated_at)
+const OF_DATUM: &str = "n-t-ga-s-nu";
+/// Output fields for detail (title, story, general_all_no)
+const OF_DETAIL: &str = "t-s-ga";
+
+fn with_headers(site: &SyosetuSite, req: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
+    if site.over18 {
+        let mut headers = HeaderMap::new();
+        headers.insert(COOKIE, HeaderValue::from_static("over18=yes"));
+        req.headers(headers)
+    } else {
+        req
+    }
+}
+
+fn to_datum(site: &SyosetuSite, datum: &Value) -> Value {
+    let id = datum["id"].as_str().unwrap_or_default();
+    let page_count = datum["page"].as_u64().unwrap_or(0);
+    let pages = build_pages(site.type_str, id, page_count);
+    let mut obj = datum.as_object().cloned().unwrap_or_default();
+    obj.remove("page");
+    obj.insert("type".to_string(), json!(site.type_str));
+    obj.insert("pages".to_string(), pages);
+    Value::Object(obj)
+}
+
+fn toc_to_json(title: &str, episodes: &[TocEpisode]) -> Value {
+    let eps: Vec<Value> = episodes
+        .iter()
+        .map(|e| json!({"num": e.num, "title": e.title}))
+        .collect();
+    json!({
+        "title": title,
+        "episodes": eps,
+    })
+}
+
+async fn site_api(
+    site: &SyosetuSite,
+    client: &reqwest::Client,
+    params: &[(&str, String)],
+) -> Result<Vec<Value>, AppError> {
+    fetch_api(client, site.api_url, params, None).await
+}
+
+async fn fetch_ranking(
+    site: &'static SyosetuSite,
+    client: &reqwest::Client,
+    genre: u32,
+    limit: usize,
+    order: &str,
+) -> Result<Vec<Value>, AppError> {
+    site_api(
+        site,
+        client,
+        &[
+            ("of", OF_RANKING.to_string()),
+            ("lim", limit.to_string()),
+            ("order", order.to_string()),
+            (site.genre_param, genre.to_string()),
+        ],
+    )
+    .await
+}
+
+pub async fn fetch_ranking_list(
+    site: &'static SyosetuSite,
+    client: &reqwest::Client,
+    limit: usize,
+    period: &str,
+) -> Result<Value, AppError> {
+    let order = match period {
+        "daily" => "dailypoint",
+        "weekly" => "weeklypoint",
+        "monthly" => "monthlypoint",
+        "quarter" => "quarterpoint",
+        "yearly" => "yearlypoint",
+        _ => "dailypoint",
+    };
+
+    let mut handles = Vec::new();
+    for &(_, genre_id) in site.ranking_genres {
+        let client = client.clone();
+        let order = order.to_string();
+        handles.push(tokio::spawn(async move {
+            fetch_ranking(site, &client, genre_id, limit, &order).await
+        }));
+    }
+
+    let mut result = serde_json::Map::new();
+    for (i, handle) in handles.into_iter().enumerate() {
+        let data = handle.await.map_err(|e| AppError::Internal(e.to_string()))??;
+        result.insert(site.ranking_genres[i].0.to_string(), Value::Array(data));
+    }
+    Ok(Value::Object(result))
+}
+
+pub async fn fetch_datum(
+    site: &SyosetuSite,
+    client: &reqwest::Client,
+    id: &str,
+) -> Result<Value, AppError> {
+    let data = site_api(
+        site,
+        client,
+        &[
+            ("of", OF_DATUM.to_string()),
+            ("ncode", id.to_string()),
+        ],
+    )
+    .await?;
+    data.first()
+        .map(|d| to_datum(site, d))
+        .ok_or_else(|| AppError::Upstream("Novel not found".to_string()))
+}
+
+pub async fn fetch_data(
+    site: &SyosetuSite,
+    client: &reqwest::Client,
+    ids: &[String],
+) -> Result<Vec<Value>, AppError> {
+    let ncode_str = ids.join("-");
+    let data = site_api(
+        site,
+        client,
+        &[
+            ("of", OF_DATUM.to_string()),
+            ("ncode", ncode_str),
+        ],
+    )
+    .await?;
+    Ok(data.iter().map(|d| to_datum(site, d)).collect())
+}
+
+pub async fn fetch_detail(
+    site: &SyosetuSite,
+    client: &reqwest::Client,
+    id: &str,
+) -> Result<Value, AppError> {
+    let data = site_api(
+        site,
+        client,
+        &[
+            ("of", OF_DETAIL.to_string()),
+            ("ncode", id.to_string()),
+        ],
+    )
+    .await?;
+    let item = data
+        .first()
+        .ok_or_else(|| AppError::Upstream("Novel not found".to_string()))?;
+    Ok(json!({
+        "title": item["title"].as_str().unwrap_or_default(),
+        "synopsis": item["story"].as_str().unwrap_or_default(),
+        "page": item["page"].as_u64().unwrap_or(0),
+    }))
+}
+
+pub async fn fetch_search(
+    site: &SyosetuSite,
+    client: &reqwest::Client,
+    word: &str,
+) -> Result<Value, AppError> {
+    let data = site_api(
+        site,
+        client,
+        &[
+            ("of", OF_RANKING.to_string()),
+            ("word", word.to_string()),
+            ("lim", "20".to_string()),
+            ("order", "hyoka".to_string()),
+        ],
+    )
+    .await?;
+    Ok(Value::Array(data))
+}
+
+pub async fn fetch_toc(
+    site: &'static SyosetuSite,
+    client: &reqwest::Client,
+    ncode: &str,
+) -> Result<Value, AppError> {
+    let base_url = format!("{}/{}/", site.base_url, ncode);
+    let res = with_headers(site, client.get(&base_url)).send().await?;
+    if !res.status().is_success() {
+        return Err(AppError::Upstream(format!(
+            "{} toc error: {}",
+            site.type_str,
+            res.status()
+        )));
+    }
+    let first = parse_toc(&res.text().await?);
+
+    if first.last_page <= 1 {
+        return Ok(toc_to_json(&first.title, &first.episodes));
+    }
+
+    let mut handles = Vec::new();
+    for page in 2..=first.last_page {
+        let client = client.clone();
+        let url = format!("{}?p={}", base_url, page);
+        handles.push(tokio::spawn(async move {
+            let res = with_headers(site, client.get(&url)).send().await?;
+            if !res.status().is_success() {
+                return Err(AppError::Upstream(format!(
+                    "{} toc page {} error: {}",
+                    site.type_str,
+                    page,
+                    res.status()
+                )));
+            }
+            let toc = parse_toc(&res.text().await?);
+            Ok(toc.episodes)
+        }));
+    }
+
+    let mut all_titles: Vec<String> = first.episodes.into_iter().map(|e| e.title).collect();
+    for handle in handles {
+        let episodes = handle.await.map_err(|e| AppError::Internal(e.to_string()))??;
+        for ep in episodes {
+            all_titles.push(ep.title);
+        }
+    }
+
+    let episodes: Vec<Value> = all_titles
+        .iter()
+        .enumerate()
+        .map(|(i, t)| json!({"num": i + 1, "title": t}))
+        .collect();
+
+    Ok(json!({
+        "title": first.title,
+        "episodes": episodes,
+    }))
+}
+
+pub async fn fetch_page(
+    site: &SyosetuSite,
+    client: &reqwest::Client,
+    ncode: &str,
+    page: &str,
+) -> Result<Option<String>, AppError> {
+    let url = format!("{}/{}/{}/", site.base_url, ncode, page);
+    let res = with_headers(site, client.get(&url)).send().await?;
+
+    let res = if res.status().as_u16() == 404 {
+        let fallback_url = format!("{}/{}/", site.base_url, ncode);
+        with_headers(site, client.get(&fallback_url)).send().await?
+    } else {
+        res
+    };
+
+    if !res.status().is_success() {
+        return Err(AppError::Upstream(format!(
+            "{} page error: {}",
+            site.type_str,
+            res.status()
+        )));
+    }
+    Ok(parse_page(&res.text().await?, ".p-novel__text"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -252,5 +552,27 @@ mod tests {
         assert_eq!(result[0]["novelupdated_at"], "2026-01-01");
         assert_eq!(result[1]["id"], "n2222bb");
         assert_eq!(result[1]["page"], 7);
+    }
+
+    // ── OF constants must use hyphens, not commas (regression for syosetu API bug) ──
+    // The syosetu API `of` parameter requires hyphen-separated field codes.
+    // Commas get URL-encoded to %2C by reqwest, causing the API to return null entries.
+
+    #[test]
+    fn of_ranking_uses_hyphens() {
+        assert!(!OF_RANKING.contains(','), "OF_RANKING must not contain commas: {OF_RANKING}");
+        assert!(OF_RANKING.contains('-'), "OF_RANKING must use hyphen separators: {OF_RANKING}");
+    }
+
+    #[test]
+    fn of_datum_uses_hyphens() {
+        assert!(!OF_DATUM.contains(','), "OF_DATUM must not contain commas: {OF_DATUM}");
+        assert!(OF_DATUM.contains('-'), "OF_DATUM must use hyphen separators: {OF_DATUM}");
+    }
+
+    #[test]
+    fn of_detail_uses_hyphens() {
+        assert!(!OF_DETAIL.contains(','), "OF_DETAIL must not contain commas: {OF_DETAIL}");
+        assert!(OF_DETAIL.contains('-'), "OF_DETAIL must use hyphen separators: {OF_DETAIL}");
     }
 }
