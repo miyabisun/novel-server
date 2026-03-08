@@ -2,17 +2,20 @@
 
 ## 技術スタック
 
-- **バックエンド**: Rust (axum + tokio + rusqlite)
+- **バックエンド**: Nim (Jester + asyncdispatch + db_sqlite)
 - **フロントエンド**: Svelte 5 + Vite + Sass
 
 ## 前提条件
 
-- [Rust](https://rustup.rs/) (stable)
+- [Nim](https://nim-lang.org/) (>= 2.0)
 - [Node.js](https://nodejs.org/) (フロントエンドビルド用)
 
 ## セットアップ
 
 ```bash
+# Nim 依存インストール
+nimble install -y --depsOnly
+
 # フロントエンドの依存インストール + ビルド
 cd client && npm install && npx vite build && cd ..
 
@@ -24,13 +27,10 @@ cp .env.example .env
 
 ```bash
 # 開発
-cargo run
+nim c -r src/main.nim
 
 # 本番（リリースビルド）
-cargo run --release
-
-# または bin/dev で一括ビルド＆起動
-bin/dev
+nim c -d:release -r src/main.nim
 ```
 
 `http://localhost:3000` にアクセスするとアプリケーションが表示されます。
@@ -41,11 +41,11 @@ bin/dev
 
 | コマンド | 説明 |
 |---------|------|
+| `nimble install -y --depsOnly` | Nim 依存インストール |
 | `cd client && npm install && npx vite build` | フロントエンドセットアップ + ビルド |
-| `cargo run` | 開発サーバー起動 |
-| `cargo run --release` | 本番サーバー起動 |
-| `cargo build --release` | リリースビルド |
-| `cargo test` | テスト実行 |
+| `nim c -r src/main.nim` | 開発サーバー起動 |
+| `nim c -d:release -r src/main.nim` | 本番サーバー起動 |
+| `bash test/integration.sh` | インテグレーションテスト実行 |
 
 ## 環境変数
 

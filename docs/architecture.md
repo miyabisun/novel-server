@@ -4,31 +4,30 @@
 
 ```
 novel-server/
-├── Cargo.toml                  # Rust プロジェクト定義
-├── src/                        # バックエンド（Rust）
-│   ├── main.rs                 # エントリポイント（axum + tokio::main）
-│   ├── config.rs               # 環境変数の読み込み
-│   ├── error.rs                # AppError enum + IntoResponse
-│   ├── state.rs                # AppState（db, cache, config, http）
-│   ├── db.rs                   # SQLite 初期化（rusqlite）
-│   ├── cache.rs                # インメモリキャッシュ（HashMap + TTL）
-│   ├── sanitize.rs             # HTML サニタイズ（ammonia）
-│   ├── spa.rs                  # SPA 用 index.html 配信
-│   ├── sync.rs                 # お気に入りバックグラウンド同期
+├── novel_server.nimble         # Nim パッケージ定義
+├── nim.cfg                     # コンパイラ設定
+├── src/                        # バックエンド（Nim）
+│   ├── main.nim                # エントリポイント（Jester + asyncdispatch）
+│   ├── config.nim              # 環境変数の読み込み
+│   ├── error.nim               # AppError 例外型
+│   ├── state.nim               # AppState（db, cache, config, http）
+│   ├── db.nim                  # SQLite 初期化（db_sqlite）
+│   ├── cache.nim               # インメモリキャッシュ（Table + TTL）
+│   ├── sanitize.nim            # HTML サニタイズ（allowlist 方式）
+│   ├── spa.nim                 # SPA 用 index.html 配信
+│   ├── sync.nim                # お気に入りバックグラウンド同期
 │   ├── modules/
-│   │   ├── mod.rs              # ModuleType enum + dispatch
-│   │   ├── syosetu.rs          # なろう系共通ユーティリティ
-│   │   ├── narou.rs            # なろうスクレイピング
-│   │   ├── kakuyomu.rs         # カクヨムスクレイピング
-│   │   └── nocturne.rs         # ノクターンスクレイピング
+│   │   ├── module_type.nim     # ModuleType enum + dispatch
+│   │   ├── syosetu.nim         # なろう/ノクターン共通処理
+│   │   └── kakuyomu.nim        # カクヨムスクレイピング
 │   └── routes/
-│       ├── mod.rs              # ルーター組み立て
-│       ├── detail.rs           # 小説詳細 API
-│       ├── favorites.rs        # お気に入り CRUD
-│       ├── ranking.rs          # ランキング API
-│       ├── search.rs           # 検索 API
-│       ├── toc.rs              # 目次 API
-│       └── pages.rs            # 小説本文 API
+│       ├── router.nim          # Jester ルーター組み立て
+│       ├── detail.nim          # 小説詳細 API
+│       ├── favorites.nim       # お気に入り CRUD
+│       ├── ranking.nim         # ランキング API
+│       ├── search.nim          # 検索 API
+│       ├── toc.nim             # 目次 API
+│       └── pages.nim           # 小説本文 API
 ├── client/                     # フロントエンド（Svelte 5）
 │   ├── src/
 │   │   ├── App.svelte          # ルートコンポーネント
@@ -39,6 +38,7 @@ novel-server/
 │   │   │   ├── fetcher.js      # fetch ラッパー
 │   │   │   ├── router.svelte.js # SPA ルーター
 │   │   │   └── components/
+│   │   │       ├── ConfirmModal.svelte
 │   │   │       ├── Header.svelte
 │   │   │       └── NovelDetailModal.svelte
 │   │   └── pages/
@@ -57,49 +57,48 @@ novel-server/
 
 | 用途 | ライブラリ |
 |------|-----------|
-| Web フレームワーク | axum + tokio |
-| データベース | rusqlite (bundled SQLite) |
-| HTML パース | scraper |
-| HTML サニタイズ | ammonia |
-| HTTP クライアント | reqwest |
-| 日時処理 | chrono |
-| 環境変数 | dotenvy |
-| シリアライズ | serde + serde_json |
-| ログ | tracing + tracing-subscriber |
-| エラー型 | thiserror |
+| Web フレームワーク | Jester + asyncdispatch |
+| データベース | db_sqlite (stdlib) |
+| HTML パース | htmlparser (stdlib) + nimquery |
+| HTML サニタイズ | カスタム実装（allowlist 方式） |
+| HTTP クライアント | httpclient (stdlib) |
+| 日時処理 | times (stdlib) |
+| 環境変数 | カスタム .env ローダー |
+| シリアライズ | json (stdlib) |
+| ログ | logging (stdlib) |
+| 正規表現 | re (stdlib) |
 
 ### 設計方針
 
-- **enum dispatch**: `ModuleType { Narou, Nocturne, Kakuyomu }` で 3 モジュールを切り替え。trait objects より単純で型安全。
-- **DB**: `Arc<Mutex<rusqlite::Connection>>` — SQLite は高速なので非同期プール不要。Mutex guard は `{}` ブロック内で完結させ `.await` を跨がない。
-- **Cache**: `Arc<Mutex<HashMap<String, CacheEntry>>>` — 最大 10k 件、serde_json::Value で異種データ格納。
-- **Background sync**: `tokio::spawn` + `tokio::time::interval`（narou/nocturne 10 分）、`tokio::time::sleep` チェーン（kakuyomu 動的間隔）。
+- **enum dispatch**: `ModuleType { Narou, Nocturne, Kakuyomu }` で 3 モジュールを切り替え。
+- **DB**: `DbConn` + `Lock` — SQLite は高速なので非同期プール不要。Lock で排他制御し acquire/release をブロック内で完結。
+- **Cache**: `Table[string, CacheEntry]` + `Lock` — 最大 10k 件、JsonNode で異種データ格納。
+- **Background sync**: `asyncCheck` + `sleepAsync`（narou/nocturne 10 分固定間隔）、sleep チェーン（kakuyomu 動的間隔）。
 
 ### リクエスト処理の流れ
 
 ```
 リクエスト
-  → tracing logger
-  → [basePath でルーティング]
-  → ルートハンドラ
-  → レスポンス
+  → Jester router
+  → ルートハンドラ (→ エラーハンドリング)
+  → JSON レスポンス
 ```
 
 ### スクレイピングモジュール
 
 `src/modules/` 内の各モジュールは `ModuleType` の enum dispatch により以下のメソッドを提供:
 
-- `fetch_ranking_list(limit, period)` — ランキングデータを取得してジャンル別にグループ化（period: `daily` / `weekly` / `monthly` / `quarter` / `yearly`）
-- `fetch_search(word)` — キーワードで小説を検索（最大 20 件、評価順）
-- `fetch_toc(id)` — 小説の目次（全エピソードのタイトルと番号）を取得
-- `fetch_detail(id)` — 小説のタイトル・あらすじ・総ページ数を取得
-- `fetch_page(id, num)` — 小説の本文 HTML を取得
-- `fetch_data(ids)` — 複数小説のメタデータを一括取得（同期用）
-- `fetch_datum(id)` — 単一小説のメタデータを取得（同期用）
+- `fetchRankingList(client, limit, period)` — ランキングデータを取得してジャンル別にグループ化（period: `daily` / `weekly` / `monthly` / `quarter` / `yearly`）
+- `fetchSearch(client, word)` — キーワードで小説を検索（最大 20 件、評価順）
+- `fetchToc(client, id)` — 小説の目次（全エピソードのタイトルと番号）を取得
+- `fetchDetail(client, id)` — 小説のタイトル・あらすじ・総ページ数を取得
+- `fetchPage(client, id, num)` — 小説の本文 HTML を取得
+- `fetchData(client, ids)` — 複数小説のメタデータを一括取得（同期用）
+- `fetchDatum(client, id)` — 単一小説のメタデータを取得（同期用）
 
 ### HTML サニタイズ
 
-`src/sanitize.rs` では ammonia を使用し、スクレイピングモジュールが返す本文 HTML をサニタイズしてからクライアントに返しています。
+`src/sanitize.nim` ではカスタム実装の allowlist 方式でサニタイズしています。
 
 #### 許可タグ
 
@@ -112,6 +111,7 @@ em, strong, b, i, u, s, sub, sup
 
 - **許可タグ**: 全属性を削除した上でタグを保持
 - **非許可タグ**: タグを削除しテキストコンテンツのみ保持
+- **コンテンツ削除タグ**: script, style, title, noscript, template はコンテンツごと削除
 
 #### 全属性を削除する理由
 
@@ -119,7 +119,7 @@ em, strong, b, i, u, s, sub, sup
 
 ### キャッシュ戦略
 
-インメモリの HashMap ベースキャッシュを使用しています（`src/cache.rs`）。
+インメモリの Table ベースキャッシュを使用しています（`src/cache.nim`）。
 
 | 対象 | TTL | 説明 |
 |------|-----|------|
@@ -131,7 +131,7 @@ em, strong, b, i, u, s, sub, sup
 
 キャッシュの強制更新は各エンドポイントの `PATCH` メソッドで行えます。
 
-エラーレスポンスはキャッシュしない設計。`cache.set()` は成功時のみ呼び出されるため、一時的な障害が解消すれば次のリクエストで正常データを取得・キャッシュできる。
+エラーレスポンスはキャッシュしない設計。`cache.put()` は成功時のみ呼び出されるため、一時的な障害が解消すれば次のリクエストで正常データを取得・キャッシュできる。
 
 ### エラーハンドリング
 
@@ -139,30 +139,30 @@ em, strong, b, i, u, s, sub, sup
 
 | 層 | リトライ | 理由 |
 |----|---------|------|
-| ルートハンドラ（`routes/*.rs`） | 3 回 + 線形バックオフ（500ms × 試行回数） | ユーザーリクエストに対する応答品質を保証 |
-| スクレイピングモジュール（`modules/*.rs`） | なし | 単純な fetch に徹し、リトライ判断は呼び出し元に委ねる |
-| バックグラウンド同期（`sync.rs`） | なし（ループ継続で暗黙的リトライ） | 次の周期で自動的に再試行される |
+| ルートハンドラ（`routes/*.nim`） | 3 回 + 線形バックオフ（500ms × 試行回数） | ユーザーリクエストに対する応答品質を保証 |
+| スクレイピングモジュール（`modules/*.nim`） | なし | 単純な fetch に徹し、リトライ判断は呼び出し元に委ねる |
+| バックグラウンド同期（`sync.nim`） | なし（ループ継続で暗黙的リトライ） | 次の周期で自動的に再試行される |
 
 #### サイト構造変更への対応
 
-scraper セレクタが空を返した場合、各モジュールは `None` または空配列を返す。現状は明示的な検知・通知機構はなく、サーバーログで確認する。
+nimquery セレクタが空を返した場合、各モジュールは `none` または空配列を返す。現状は明示的な検知・通知機構はなく、サーバーログで確認する。
 
 ### バックグラウンド同期
 
-`src/sync.rs` がお気に入りに登録された小説のメタデータ（タイトル・ページ数・更新日時）を定期的に同期します。
+`src/sync.nim` がお気に入りに登録された小説のメタデータ（タイトル・ページ数・更新日時）を定期的に同期します。
 
 | サイト | 方式 | 間隔 |
 |--------|------|------|
-| narou / nocturne | `fetch_data` で全件一括取得 | 10 分 |
-| kakuyomu | `fetch_datum` で 1 件ずつラウンドロビン | 1 時間で全件を巡回 |
+| narou / nocturne | `fetchData` で全件一括取得 | 10 分 |
+| kakuyomu | `fetchDatum` で 1 件ずつラウンドロビン | 1 時間で全件を巡回 |
 
-#### narou / nocturne（tokio::time::interval）
+#### narou / nocturne（sleepAsync interval）
 
-なろう API は複数 ID を一括取得できるため、処理時間が短く安定している。固定間隔の interval で十分。
+なろう API は複数 ID を一括取得できるため、処理時間が短く安定している。固定間隔の sleepAsync ループで十分。
 
-#### kakuyomu（tokio::time::sleep チェーン）
+#### kakuyomu（sleepAsync チェーン）
 
-HTML スクレイピングで 1 件ずつ取得するため、お気に入り件数に応じて間隔を動的に計算する。`sleep(3_600_000ms / count)` で 1 時間かけて全件を均等に巡回する。
+HTML スクレイピングで 1 件ずつ取得するため、お気に入り件数に応じて間隔を動的に計算する。`sleepAsync(3_600_000ms / count)` で 1 時間かけて全件を均等に巡回する。
 
 #### スケーリング特性（kakuyomu）
 
@@ -176,12 +176,12 @@ HTML スクレイピングで 1 件ずつ取得するため、お気に入り件
 
 #### エラー時の挙動
 
-- **narou / nocturne**: 例外をログして継続。interval は次の周期で自動再実行
-- **kakuyomu**: 例外をログし、60 秒待機後に sleep で再スケジュール
+- **narou / nocturne**: 例外をログして継続。次の周期で自動再実行
+- **kakuyomu**: 例外をログし、60 秒待機後に再スケジュール
 
 ### データベース
 
-rusqlite (bundled SQLite) を使用。起動時に `db.rs` が `CREATE TABLE IF NOT EXISTS` でスキーマを自動作成します。
+db_sqlite (Nim stdlib) を使用。起動時に `db.nim` が `CREATE TABLE IF NOT EXISTS` でスキーマを自動作成します。
 
 DB パスは環境変数 `DATABASE_PATH` で指定します（デフォルト: `/data/novel.db`）。
 

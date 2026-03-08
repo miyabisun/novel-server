@@ -13,11 +13,17 @@ docker run -p 3000:3000 -v novel-data:/data ghcr.io/miyabisun/novel-server:lates
 
 Open `http://localhost:3000` in your browser.
 
-## Quick Start (Rust)
+## Quick Start (Nim)
 
 ```bash
+# Install dependencies
+nimble install -y --depsOnly
+
+# Build frontend
 cd client && npm install && npx vite build && cd ..
-cargo run --release
+
+# Run
+nim c -d:release -r src/main.nim
 ```
 
 Open `http://localhost:3000` in your browser.
@@ -46,3 +52,5 @@ The database is automatically created on first startup.
 - [Development Guide](docs/development.md) — Local setup, build, and project structure
 - [API Reference](docs/api.md) — REST API specification
 - [Architecture](docs/architecture.md) — Backend / frontend architecture overview
+- [Testing](docs/testing.md) — Test strategy and integration tests
+- [Adding Modules](docs/add-module.md) — Guide for adding new scraping modules

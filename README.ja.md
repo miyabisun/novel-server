@@ -12,11 +12,17 @@ docker run -p 3000:3000 -v novel-data:/data ghcr.io/miyabisun/novel-server:lates
 
 ブラウザで `http://localhost:3000` を開く。
 
-## Quick Start (Rust)
+## Quick Start (Nim)
 
 ```bash
+# 依存インストール
+nimble install -y --depsOnly
+
+# フロントエンドビルド
 cd client && npm install && npx vite build && cd ..
-cargo run --release
+
+# 実行
+nim c -d:release -r src/main.nim
 ```
 
 ブラウザで `http://localhost:3000` を開く。

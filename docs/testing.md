@@ -3,10 +3,12 @@
 ## テストの実行
 
 ```bash
-cargo test         # 全テスト実行
-```
+# インテグレーションテスト（サーバービルド + 起動 + API検証）
+bash test/integration.sh
 
-テストはソースファイル内に `#[cfg(test)] mod tests` として配置する。
+# 手動テスト（サーバー起動後にブラウザで確認）
+nim c -r src/main.nim
+```
 
 ## 方針
 
@@ -14,11 +16,11 @@ cargo test         # 全テスト実行
 
 ## テスト対象
 
-### 1. `modules/*.rs` — API レスポンス処理・パース
+### 1. `modules/*.nim` — API レスポンス処理・パース
 
-- `syosetu.rs`: `process_api_response()` — null/非オブジェクトのフィルタリング、`map_item()` のフィールド変換
-- `narou.rs` / `nocturne.rs`: `OF_*` 定数のフォーマット検証（ハイフン区切り、カンマ不使用）
+- `syosetu.nim`: `processApiResponse()` — null/非オブジェクトのフィルタリング、`mapItem()` のフィールド変換
+- `syosetu.nim`: `OfRanking` / `OfDatum` / `OfDetail` 定数のフォーマット検証（ハイフン区切り、カンマ不使用）
 
-### 2. `sanitize.rs` — HTML サニタイズ
+### 2. `sanitize.nim` — HTML サニタイズ
 
 許可タグリストに基づくサニタイズの動作確認。XSS ベクター（`<script>`, `<img onerror>` 等）が除去されることの検証。
