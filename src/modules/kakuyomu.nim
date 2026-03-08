@@ -5,15 +5,15 @@ import ../error
 const KakuyomuType = "kakuyomu"
 
 type
-  WorkInfo = object
-    title: string
-    story: string
-    novelupdatedAt: Option[string]
+  WorkInfo* = object
+    title*: string
+    story*: string
+    novelupdatedAt*: Option[string]
 
-  EpisodeInfo = object
-    num: int
-    id: string
-    title: string
+  EpisodeInfo* = object
+    num*: int
+    id*: string
+    title*: string
 
 proc innerText(node: XmlNode): string =
   case node.kind
@@ -38,9 +38,10 @@ proc newKakuyomuClient(): AsyncHttpClient =
     userAgent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
   )
 
-proc parseApolloState(html: string): JsonNode =
+proc parseApolloState*(html: string): JsonNode =
   let doc = parseHtml(newStringStream(html))
-  let nodes = doc.querySelectorAll("#__NEXT_DATA__")
+  # Use attribute selector: nimquery cannot parse IDs starting with underscore
+  let nodes = doc.querySelectorAll("script[id='__NEXT_DATA__']")
   if nodes.len == 0:
     raise newAppError(Upstream, "Failed to parse kakuyomu work page")
   let raw = innerText(nodes[0])
@@ -50,7 +51,7 @@ proc parseApolloState(html: string): JsonNode =
     raise newAppError(Upstream, "Apollo state not found")
   apollo
 
-proc extractWork(apollo: JsonNode, id: string): WorkInfo =
+proc extractWork*(apollo: JsonNode, id: string): WorkInfo =
   let key = "Work:" & id
   let work = apollo{key}
   if work == nil or work.kind == JNull:
@@ -74,7 +75,7 @@ proc extractWork(apollo: JsonNode, id: string): WorkInfo =
 
   WorkInfo(title: title, story: story, novelupdatedAt: novelupdatedAt)
 
-proc extractEpisodes(apollo: JsonNode, id: string): seq[EpisodeInfo] =
+proc extractEpisodes*(apollo: JsonNode, id: string): seq[EpisodeInfo] =
   if apollo.kind != JObject:
     return @[]
 
@@ -229,6 +230,15 @@ proc fetchData*(ids: seq[string]): Future[seq[JsonNode]] {.async.} =
     result.add(await fetchDatum(id))
     await sleepAsync(500)
 
+proc parseEpisodePage*(html: string): Option[string] =
+  let doc = parseHtml(newStringStream(html))
+  let nodes = doc.querySelectorAll(".widget-episodeBody")
+  if nodes.len > 0:
+    let content = innerHtml(nodes[0])
+    if content.len > 0:
+      return some(content)
+  return none(string)
+
 proc fetchPage*(id: string, pageId: string): Future[Option[string]] {.async.} =
   var episodeId = pageId
 
@@ -255,8 +265,4 @@ proc fetchPage*(id: string, pageId: string): Future[Option[string]] {.async.} =
   finally:
     c.close()
 
-  let doc = parseHtml(newStringStream(html))
-  let nodes = doc.querySelectorAll(".widget-episodeBody")
-  if nodes.len > 0:
-    return some(innerHtml(nodes[0]))
-  return none(string)
+  return parseEpisodePage(html)
