@@ -24,7 +24,7 @@ proc handleDetail*(state: AppState, typeStr: string, id: string): Future[(HttpCo
       return (Http200, $cached.get)
     let label = "fetchDetail " & typeStr & "/" & id
     let detail = await withRetryJson(label, proc(): Future[JsonNode] {.async.} =
-      return await module.fetchDetail(state.http, id)
+      return await module.fetchDetail(id)
     )
     state.cache.put(key, detail, DetailTtl)
     return (Http200, $detail)

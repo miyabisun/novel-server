@@ -90,7 +90,7 @@ proc newSiteClient(site: SyosetuSite): AsyncHttpClient =
   if site.over18:
     result.headers = newHttpHeaders({"Cookie": "over18=yes"})
 
-proc fetchApi*(client: AsyncHttpClient, apiUrl: string,
+proc fetchApi*(apiUrl: string,
                params: seq[(string, string)],
                headers: HttpHeaders = nil): Future[seq[JsonNode]] {.async.} =
   var allParams = @[("out", "json")]
@@ -107,16 +107,17 @@ proc fetchApi*(client: AsyncHttpClient, apiUrl: string,
   if headers != nil:
     httpClient.headers = headers
 
-  let res = await httpClient.getContent(url)
-  httpClient.close()
-
-  let json = parseJson(res)
-  if json.kind != JArray:
-    raise newAppError(Upstream, "API returned non-array response")
-  var items: seq[JsonNode] = @[]
-  for item in json:
-    items.add(item)
-  return processApiResponse(items)
+  try:
+    let res = await httpClient.getContent(url)
+    let json = parseJson(res)
+    if json.kind != JArray:
+      raise newAppError(Upstream, "API returned non-array response")
+    var items: seq[JsonNode] = @[]
+    for item in json:
+      items.add(item)
+    return processApiResponse(items)
+  finally:
+    httpClient.close()
 
 proc siteApi(site: SyosetuSite, params: seq[(string, string)]): Future[seq[JsonNode]] {.async.} =
   let headers = if site.over18:
@@ -124,7 +125,6 @@ proc siteApi(site: SyosetuSite, params: seq[(string, string)]): Future[seq[JsonN
   else:
     nil
   return await fetchApi(
-    newAsyncHttpClient(),
     site.apiUrl,
     params,
     headers,
@@ -154,7 +154,7 @@ proc fetchRanking(site: SyosetuSite, genre: int, limit: int, order: string): Fut
     (site.genreParam, $genre),
   ])
 
-proc fetchRankingList*(site: SyosetuSite, client: AsyncHttpClient, limit: int, period: string): Future[JsonNode] {.async.} =
+proc fetchRankingList*(site: SyosetuSite, limit: int, period: string): Future[JsonNode] {.async.} =
   let order = case period
     of "daily": "dailypoint"
     of "weekly": "weeklypoint"
@@ -172,7 +172,7 @@ proc fetchRankingList*(site: SyosetuSite, client: AsyncHttpClient, limit: int, p
     let data = await fut
     result[site.rankingGenres[i][0]] = %data
 
-proc fetchDatum*(site: SyosetuSite, client: AsyncHttpClient, id: string): Future[JsonNode] {.async.} =
+proc fetchDatum*(site: SyosetuSite, id: string): Future[JsonNode] {.async.} =
   let data = await siteApi(site, @[
     ("of", OfDatum),
     ("ncode", id),
@@ -181,7 +181,7 @@ proc fetchDatum*(site: SyosetuSite, client: AsyncHttpClient, id: string): Future
     raise newAppError(Upstream, "Novel not found")
   return toDatum(site, data[0])
 
-proc fetchData*(site: SyosetuSite, client: AsyncHttpClient, ids: seq[string]): Future[seq[JsonNode]] {.async.} =
+proc fetchData*(site: SyosetuSite, ids: seq[string]): Future[seq[JsonNode]] {.async.} =
   let ncodeStr = ids.join("-")
   let data = await siteApi(site, @[
     ("of", OfDatum),
@@ -191,7 +191,7 @@ proc fetchData*(site: SyosetuSite, client: AsyncHttpClient, ids: seq[string]): F
   for d in data:
     result.add(toDatum(site, d))
 
-proc fetchDetail*(site: SyosetuSite, client: AsyncHttpClient, id: string): Future[JsonNode] {.async.} =
+proc fetchDetail*(site: SyosetuSite, id: string): Future[JsonNode] {.async.} =
   let data = await siteApi(site, @[
     ("of", OfDetail),
     ("ncode", id),
@@ -205,7 +205,7 @@ proc fetchDetail*(site: SyosetuSite, client: AsyncHttpClient, id: string): Futur
     "page": item{"page"}.getInt(0),
   }
 
-proc fetchSearch*(site: SyosetuSite, client: AsyncHttpClient, word: string): Future[JsonNode] {.async.} =
+proc fetchSearch*(site: SyosetuSite, word: string): Future[JsonNode] {.async.} =
   let data = await siteApi(site, @[
     ("of", OfRanking),
     ("word", word),
@@ -290,12 +290,15 @@ proc parsePage*(html: string, selector: string): Option[string] =
   else:
     some(parts.join("<hr>"))
 
-proc fetchToc*(site: SyosetuSite, client: AsyncHttpClient, ncode: string): Future[JsonNode] {.async.} =
+proc fetchToc*(site: SyosetuSite, ncode: string): Future[JsonNode] {.async.} =
   let baseUrl = site.baseUrl & "/" & ncode & "/"
 
   let siteClient = newSiteClient(site)
-  let firstHtml = await siteClient.getContent(baseUrl)
-  siteClient.close()
+  var firstHtml: string
+  try:
+    firstHtml = await siteClient.getContent(baseUrl)
+  finally:
+    siteClient.close()
 
   let first = parseToc(firstHtml)
 
@@ -308,9 +311,10 @@ proc fetchToc*(site: SyosetuSite, client: AsyncHttpClient, ncode: string): Futur
     let url = baseUrl & "?p=" & $page
     let c = newSiteClient(site)
     pageFutures.add((proc(cl: AsyncHttpClient, u: string): Future[string] {.async.} =
-      let res = await cl.getContent(u)
-      cl.close()
-      return res
+      try:
+        return await cl.getContent(u)
+      finally:
+        cl.close()
     )(c, url))
 
   for fut in pageFutures:
@@ -326,7 +330,7 @@ proc fetchToc*(site: SyosetuSite, client: AsyncHttpClient, ncode: string): Futur
 
   tocToJson(first.title, eps)
 
-proc fetchPage*(site: SyosetuSite, client: AsyncHttpClient, ncode: string, page: string): Future[Option[string]] {.async.} =
+proc fetchPage*(site: SyosetuSite, ncode: string, page: string): Future[Option[string]] {.async.} =
   let url = site.baseUrl & "/" & ncode & "/" & page & "/"
   let siteClient = newSiteClient(site)
 

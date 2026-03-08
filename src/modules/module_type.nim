@@ -1,4 +1,4 @@
-import std/[asyncdispatch, httpclient, json, options]
+import std/[asyncdispatch, json, options]
 import ../error
 import syosetu, kakuyomu
 
@@ -18,44 +18,44 @@ proc asStr*(m: ModuleType): string =
   of Nocturne: "nocturne"
   of Kakuyomu: "kakuyomu"
 
-proc fetchRankingList*(m: ModuleType, client: AsyncHttpClient, limit: int, period: string): Future[JsonNode] {.async.} =
+proc fetchRankingList*(m: ModuleType, limit: int, period: string): Future[JsonNode] {.async.} =
   case m
-  of Narou: return await syosetu.fetchRankingList(narou, client, limit, period)
-  of Nocturne: return await syosetu.fetchRankingList(nocturne, client, limit, period)
-  of Kakuyomu: return await kakuyomu.fetchRankingList(client, period)
+  of Narou: return await syosetu.fetchRankingList(narou, limit, period)
+  of Nocturne: return await syosetu.fetchRankingList(nocturne, limit, period)
+  of Kakuyomu: return await kakuyomu.fetchRankingList(period)
 
-proc fetchPage*(m: ModuleType, client: AsyncHttpClient, id: string, pageId: string): Future[Option[string]] {.async.} =
+proc fetchPage*(m: ModuleType, id: string, pageId: string): Future[Option[string]] {.async.} =
   case m
-  of Narou: return await syosetu.fetchPage(narou, client, id, pageId)
-  of Nocturne: return await syosetu.fetchPage(nocturne, client, id, pageId)
-  of Kakuyomu: return await kakuyomu.fetchPage(client, id, pageId)
+  of Narou: return await syosetu.fetchPage(narou, id, pageId)
+  of Nocturne: return await syosetu.fetchPage(nocturne, id, pageId)
+  of Kakuyomu: return await kakuyomu.fetchPage(id, pageId)
 
-proc fetchDetail*(m: ModuleType, client: AsyncHttpClient, id: string): Future[JsonNode] {.async.} =
+proc fetchDetail*(m: ModuleType, id: string): Future[JsonNode] {.async.} =
   case m
-  of Narou: return await syosetu.fetchDetail(narou, client, id)
-  of Nocturne: return await syosetu.fetchDetail(nocturne, client, id)
-  of Kakuyomu: return await kakuyomu.fetchDetail(client, id)
+  of Narou: return await syosetu.fetchDetail(narou, id)
+  of Nocturne: return await syosetu.fetchDetail(nocturne, id)
+  of Kakuyomu: return await kakuyomu.fetchDetail(id)
 
-proc fetchSearch*(m: ModuleType, client: AsyncHttpClient, word: string): Future[JsonNode] {.async.} =
+proc fetchSearch*(m: ModuleType, word: string): Future[JsonNode] {.async.} =
   case m
-  of Narou: return await syosetu.fetchSearch(narou, client, word)
-  of Nocturne: return await syosetu.fetchSearch(nocturne, client, word)
-  of Kakuyomu: return await kakuyomu.fetchSearch(client, word)
+  of Narou: return await syosetu.fetchSearch(narou, word)
+  of Nocturne: return await syosetu.fetchSearch(nocturne, word)
+  of Kakuyomu: return await kakuyomu.fetchSearch(word)
 
-proc fetchToc*(m: ModuleType, client: AsyncHttpClient, id: string): Future[JsonNode] {.async.} =
+proc fetchToc*(m: ModuleType, id: string): Future[JsonNode] {.async.} =
   case m
-  of Narou: return await syosetu.fetchToc(narou, client, id)
-  of Nocturne: return await syosetu.fetchToc(nocturne, client, id)
-  of Kakuyomu: return await kakuyomu.fetchToc(client, id)
+  of Narou: return await syosetu.fetchToc(narou, id)
+  of Nocturne: return await syosetu.fetchToc(nocturne, id)
+  of Kakuyomu: return await kakuyomu.fetchToc(id)
 
-proc fetchData*(m: ModuleType, client: AsyncHttpClient, ids: seq[string]): Future[seq[JsonNode]] {.async.} =
+proc fetchData*(m: ModuleType, ids: seq[string]): Future[seq[JsonNode]] {.async.} =
   case m
-  of Narou: return await syosetu.fetchData(narou, client, ids)
-  of Nocturne: return await syosetu.fetchData(nocturne, client, ids)
-  of Kakuyomu: return await kakuyomu.fetchData(client, ids)
+  of Narou: return await syosetu.fetchData(narou, ids)
+  of Nocturne: return await syosetu.fetchData(nocturne, ids)
+  of Kakuyomu: return await kakuyomu.fetchData(ids)
 
-proc fetchDatum*(m: ModuleType, client: AsyncHttpClient, id: string): Future[JsonNode] {.async.} =
+proc fetchDatum*(m: ModuleType, id: string): Future[JsonNode] {.async.} =
   case m
-  of Narou: return await syosetu.fetchDatum(narou, client, id)
-  of Nocturne: return await syosetu.fetchDatum(nocturne, client, id)
-  of Kakuyomu: return await kakuyomu.fetchDatum(client, id)
+  of Narou: return await syosetu.fetchDatum(narou, id)
+  of Nocturne: return await syosetu.fetchDatum(nocturne, id)
+  of Kakuyomu: return await kakuyomu.fetchDatum(id)

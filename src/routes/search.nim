@@ -13,7 +13,7 @@ proc handleSearch*(state: AppState, typeStr: string, q: string): Future[(HttpCod
     let cached = state.cache.get(key)
     if cached.isSome:
       return (Http200, $cached.get)
-    let results = await module.fetchSearch(state.http, query)
+    let results = await module.fetchSearch(query)
     state.cache.put(key, results, SearchTtl)
     return (Http200, $results)
   except AppError as e:

@@ -1,8 +1,8 @@
 import std/[tables, times, json, options, locks]
 
 const
-  MaxEntries = 10_000
-  SweepIntervalSecs = 3600
+  MaxEntries = 500
+  SweepIntervalSecs = 300
 
 type
   CacheEntry = object

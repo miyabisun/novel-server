@@ -43,7 +43,7 @@ proc syncSyosetu(state: AppState, module: ModuleType, typeStr: string) {.async.}
   if ids.len == 0: return
 
   try:
-    let data = await module.fetchData(state.http, ids)
+    let data = await module.fetchData(ids)
     acquire(state.dbLock)
     try:
       for datum in data:
@@ -91,7 +91,7 @@ proc startKakuyomuSync(state: AppState) {.async.} =
     let id = ids[index]
 
     try:
-      let datum = await module.fetchDatum(state.http, id)
+      let datum = await module.fetchDatum(id)
       updateFavoriteFromDatum(state, typeStr, datum)
       info "[sync] kakuyomu: updated " & id & " (" & $(index + 1) & "/" & $count & ")"
       index += 1

@@ -18,7 +18,7 @@ proc handleToc*(state: AppState, typeStr: string, id: string): Future[(HttpCode,
     let module = resolve(typeStr)
     let label = "fetchToc " & typeStr & "/" & id
     let toc = await withRetryJson(label, proc(): Future[JsonNode] {.async.} =
-      return await module.fetchToc(state.http, id)
+      return await module.fetchToc(id)
     )
     return (Http200, $toc)
   except AppError as e:

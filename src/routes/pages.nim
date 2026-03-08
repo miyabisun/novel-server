@@ -18,7 +18,7 @@ proc withRetryOpt(label: string, body: proc(): Future[Option[string]]): Future[O
 proc fetchAndCache(state: AppState, module: ModuleType, id: string, num: string, key: string): Future[JsonNode] {.async.} =
   let label = "fetchPage " & id & "/" & num
   let raw = await withRetryOpt(label, proc(): Future[Option[string]] {.async.} =
-    return await module.fetchPage(state.http, id, num)
+    return await module.fetchPage(id, num)
   )
   let html = clean(raw.get(""))
   state.cache.put(key, %html, PageTtl)

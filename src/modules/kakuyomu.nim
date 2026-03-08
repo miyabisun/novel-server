@@ -102,11 +102,14 @@ proc extractEpisodes(apollo: JsonNode, id: string): seq[EpisodeInfo] =
         title: ep{"title"}.getStr(""),
       ))
 
-proc fetchRanking(client: AsyncHttpClient, genre: string, rankType: string): Future[seq[JsonNode]] {.async.} =
+proc fetchRanking(genre: string, rankType: string): Future[seq[JsonNode]] {.async.} =
   let url = "https://kakuyomu.jp/rankings/" & genre & "/" & rankType
   let c = newKakuyomuClient()
-  let html = await c.getContent(url)
-  c.close()
+  var html: string
+  try:
+    html = await c.getContent(url)
+  finally:
+    c.close()
 
   let doc = parseHtml(newStringStream(html))
   let workNodes = doc.querySelectorAll(".widget-work")
@@ -136,18 +139,21 @@ proc fetchRanking(client: AsyncHttpClient, genre: string, rankType: string): Fut
       "page": page,
     })
 
-proc fetchRankingList*(client: AsyncHttpClient, period: string): Future[JsonNode] {.async.} =
+proc fetchRankingList*(period: string): Future[JsonNode] {.async.} =
   if period == "quarter":
     raise newAppError(BadRequest, "kakuyomu does not support quarter ranking")
-  let data = await fetchRanking(client, "all", period)
+  let data = await fetchRanking("all", period)
   result = newJObject()
   result["総合"] = %data
 
-proc fetchSearch*(client: AsyncHttpClient, word: string): Future[JsonNode] {.async.} =
+proc fetchSearch*(word: string): Future[JsonNode] {.async.} =
   let url = "https://kakuyomu.jp/search?q=" & encodeUrl(word)
   let c = newKakuyomuClient()
-  let html = await c.getContent(url)
-  c.close()
+  var html: string
+  try:
+    html = await c.getContent(url)
+  finally:
+    c.close()
 
   let apollo = parseApolloState(html)
 
@@ -162,15 +168,18 @@ proc fetchSearch*(client: AsyncHttpClient, word: string): Future[JsonNode] {.asy
     })
   return results
 
-proc fetchWork(client: AsyncHttpClient, id: string): Future[JsonNode] {.async.} =
+proc fetchWork(id: string): Future[JsonNode] {.async.} =
   let url = "https://kakuyomu.jp/works/" & id
   let c = newKakuyomuClient()
-  let html = await c.getContent(url)
-  c.close()
+  var html: string
+  try:
+    html = await c.getContent(url)
+  finally:
+    c.close()
   return parseApolloState(html)
 
-proc fetchToc*(client: AsyncHttpClient, id: string): Future[JsonNode] {.async.} =
-  let apollo = await fetchWork(client, id)
+proc fetchToc*(id: string): Future[JsonNode] {.async.} =
+  let apollo = await fetchWork(id)
   let work = extractWork(apollo, id)
   let episodes = extractEpisodes(apollo, id)
   var eps = newJArray()
@@ -181,8 +190,8 @@ proc fetchToc*(client: AsyncHttpClient, id: string): Future[JsonNode] {.async.} 
     "episodes": eps,
   }
 
-proc fetchDetail*(client: AsyncHttpClient, id: string): Future[JsonNode] {.async.} =
-  let apollo = await fetchWork(client, id)
+proc fetchDetail*(id: string): Future[JsonNode] {.async.} =
+  let apollo = await fetchWork(id)
   let work = extractWork(apollo, id)
   let episodes = extractEpisodes(apollo, id)
   return %*{
@@ -191,8 +200,8 @@ proc fetchDetail*(client: AsyncHttpClient, id: string): Future[JsonNode] {.async
     "page": episodes.len,
   }
 
-proc fetchDatum*(client: AsyncHttpClient, id: string): Future[JsonNode] {.async.} =
-  let apollo = await fetchWork(client, id)
+proc fetchDatum*(id: string): Future[JsonNode] {.async.} =
+  let apollo = await fetchWork(id)
   let work = extractWork(apollo, id)
   let episodes = extractEpisodes(apollo, id)
   var pages = newJArray()
@@ -214,20 +223,20 @@ proc fetchDatum*(client: AsyncHttpClient, id: string): Future[JsonNode] {.async.
   if work.novelupdatedAt.isSome:
     result["novelupdated_at"] = %work.novelupdatedAt.get
 
-proc fetchData*(client: AsyncHttpClient, ids: seq[string]): Future[seq[JsonNode]] {.async.} =
+proc fetchData*(ids: seq[string]): Future[seq[JsonNode]] {.async.} =
   result = @[]
   for id in ids:
-    result.add(await fetchDatum(client, id))
+    result.add(await fetchDatum(id))
     await sleepAsync(500)
 
-proc fetchPage*(client: AsyncHttpClient, id: string, pageId: string): Future[Option[string]] {.async.} =
+proc fetchPage*(id: string, pageId: string): Future[Option[string]] {.async.} =
   var episodeId = pageId
 
   # Small numbers are sequential page numbers that need resolution
   try:
     let num = parseInt(pageId)
     if num < 100_000:
-      let apollo = await fetchWork(client, id)
+      let apollo = await fetchWork(id)
       let episodes = extractEpisodes(apollo, id)
       let idx = num - 1
       if idx < 0 or idx >= episodes.len:
@@ -240,8 +249,11 @@ proc fetchPage*(client: AsyncHttpClient, id: string, pageId: string): Future[Opt
 
   let url = "https://kakuyomu.jp/works/" & id & "/episodes/" & episodeId
   let c = newKakuyomuClient()
-  let html = await c.getContent(url)
-  c.close()
+  var html: string
+  try:
+    html = await c.getContent(url)
+  finally:
+    c.close()
 
   let doc = parseHtml(newStringStream(html))
   let nodes = doc.querySelectorAll(".widget-episodeBody")

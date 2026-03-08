@@ -62,7 +62,7 @@ proc handlePutFavorite*(state: AppState, bodyStr: string, typeStr: string, id: s
     # Fire-and-forget: fetch metadata immediately after adding
     asyncCheck (proc() {.async.} =
       try:
-        let datum = await module.fetchDatum(state.http, id)
+        let datum = await module.fetchDatum(id)
         updateFavoriteFromDatum(state, typeStr, datum)
         info "[sync] initial fetch for " & typeStr & "/" & id
       except CatchableError as e:

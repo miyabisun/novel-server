@@ -28,7 +28,7 @@ proc handleRanking*(state: AppState, typeStr: string, period: string, useCache: 
       let cached = state.cache.get(key)
       if cached.isSome:
         return (Http200, $cached.get)
-    let ranking = await module.fetchRankingList(state.http, 100, period)
+    let ranking = await module.fetchRankingList(100, period)
     state.cache.put(key, ranking, RankingTtl)
     return (Http200, $ranking)
   except AppError as e:
