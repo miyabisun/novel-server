@@ -1,4 +1,6 @@
 src/main
+test/t_*
+!test/t_*.nim
 nimcache/
 client/build/
 client/node_modules/

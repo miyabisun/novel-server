@@ -23,7 +23,19 @@ nim c -d:release src/main.nim 2>&1 | tail -1
 # Start server
 DATABASE_PATH="$DB_PATH" PORT="$PORT" ./src/main &
 SERVER_PID=$!
-sleep 2
+
+# Wait for server to be ready
+echo "Waiting for server..."
+for i in $(seq 1 20); do
+  if curl -s -o /dev/null "http://localhost:${PORT}/" 2>/dev/null; then
+    break
+  fi
+  if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+    echo "FATAL: Server failed to start"
+    exit 1
+  fi
+  sleep 0.5
+done
 
 if ! kill -0 "$SERVER_PID" 2>/dev/null; then
   echo "FATAL: Server failed to start"
@@ -111,12 +123,14 @@ assert_status "PATCH progress without read returns 400" PATCH "$BASE/api/favorit
 assert_status "Quarter ranking for kakuyomu returns 400" GET "$BASE/api/novel/kakuyomu/ranking?period=quarter" 400
 assert_status "Invalid period returns 400" GET "$BASE/api/novel/narou/ranking?period=invalid" 400
 
-echo ""
-echo "=== Ranking (live) ==="
-assert_status "GET narou ranking returns 200" GET "$BASE/api/novel/narou/ranking?period=daily" 200
-assert_json_contains "Narou ranking has genre key" GET "$BASE/api/novel/narou/ranking?period=daily" '"異世界 \[恋愛\]"'
-assert_json_contains "Narou ranking items have id field" GET "$BASE/api/novel/narou/ranking?period=daily" '"id":'
-assert_status "PATCH ranking (cache bypass) returns 200" PATCH "$BASE/api/novel/narou/ranking?period=daily" 200
+if [ "${LIVE_TESTS:-0}" = "1" ]; then
+  echo ""
+  echo "=== Ranking (live) ==="
+  assert_status "GET narou ranking returns 200" GET "$BASE/api/novel/narou/ranking?period=daily" 200
+  assert_json_contains "Narou ranking has genre key" GET "$BASE/api/novel/narou/ranking?period=daily" '"異世界 \[恋愛\]"'
+  assert_json_contains "Narou ranking items have id field" GET "$BASE/api/novel/narou/ranking?period=daily" '"id":'
+  assert_status "PATCH ranking (cache bypass) returns 200" PATCH "$BASE/api/novel/narou/ranking?period=daily" 200
+fi
 
 echo ""
 echo "=== PATCH progress for non-existent favorite ==="
