@@ -4,6 +4,16 @@ import ../error
 
 const KakuyomuType = "kakuyomu"
 
+let RankingGenres* = @[
+  ("異世界ファンタジー", "fantasy"),
+  ("現代ファンタジー", "action"),
+  ("SF", "sf"),
+  ("恋愛", "love_story"),
+  ("ラブコメ", "romance"),
+  ("現代ドラマ", "drama"),
+  ("ホラー", "horror"),
+]
+
 type
   WorkInfo* = object
     title*: string
@@ -103,20 +113,17 @@ proc extractEpisodes*(apollo: JsonNode, id: string): seq[EpisodeInfo] =
         title: ep{"title"}.getStr(""),
       ))
 
-proc fetchRanking(genre: string, rankType: string): Future[seq[JsonNode]] {.async.} =
-  let url = "https://kakuyomu.jp/rankings/" & genre & "/" & rankType
-  let c = newKakuyomuClient()
-  var html: string
-  try:
-    html = await c.getContent(url)
-  finally:
-    c.close()
-
+proc parseRanking*(html: string): seq[JsonNode] =
   let doc = parseHtml(newStringStream(html))
   let workNodes = doc.querySelectorAll(".widget-work")
 
   result = @[]
   for elem in workNodes:
+    # Skip kakuyomu Next entries (no .widget-work-rank)
+    let rankNodes = elem.querySelectorAll(".widget-work-rank")
+    if rankNodes.len == 0:
+      continue
+
     let titleNodes = elem.querySelectorAll(".bookWalker-work-title")
     var id = ""
     var title = ""
@@ -140,12 +147,28 @@ proc fetchRanking(genre: string, rankType: string): Future[seq[JsonNode]] {.asyn
       "page": page,
     })
 
+proc fetchRanking(genre: string, rankType: string): Future[seq[JsonNode]] {.async.} =
+  let url = "https://kakuyomu.jp/rankings/" & genre & "/" & rankType
+  let c = newKakuyomuClient()
+  var html: string
+  try:
+    html = await c.getContent(url)
+  finally:
+    c.close()
+  return parseRanking(html)
+
 proc fetchRankingList*(period: string): Future[JsonNode] {.async.} =
   if period == "quarter":
     raise newAppError(BadRequest, "kakuyomu does not support quarter ranking")
-  let data = await fetchRanking("all", period)
+
+  var futures: seq[Future[seq[JsonNode]]] = @[]
+  for (_, slug) in RankingGenres:
+    futures.add(fetchRanking(slug, period))
+
   result = newJObject()
-  result["総合"] = %data
+  for i, fut in futures:
+    let data = await fut
+    result[RankingGenres[i][0]] = %data
 
 proc fetchSearch*(word: string): Future[JsonNode] {.async.} =
   let url = "https://kakuyomu.jp/search?q=" & encodeUrl(word)

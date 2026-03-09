@@ -5,6 +5,7 @@ import ../src/modules/kakuyomu
 const WorkId = "1177354054882725960"
 const WorkHtml = staticRead("fixtures/kakuyomu_work.html")
 const EpisodeHtml = staticRead("fixtures/kakuyomu_episode.html")
+const RankingHtml = staticRead("fixtures/kakuyomu_ranking.html")
 
 suite "parseApolloState":
   test "parses __NEXT_DATA__ from work page":
@@ -82,6 +83,32 @@ suite "extractEpisodes":
         found = true
         break
     check found
+
+suite "parseRanking":
+  test "parses normal entries":
+    let items = parseRanking(RankingHtml)
+    check items.len == 3
+
+  test "excludes kakuyomu Next entries":
+    let items = parseRanking(RankingHtml)
+    for item in items:
+      check item["title"].getStr != "Next Work"
+
+  test "extracts id from href":
+    let items = parseRanking(RankingHtml)
+    check items[0]["id"].getStr == "111"
+    check items[1]["id"].getStr == "222"
+    check items[2]["id"].getStr == "444"
+
+  test "extracts episode count":
+    let items = parseRanking(RankingHtml)
+    check items[0]["page"].getInt == 10
+    check items[1]["page"].getInt == 20
+    check items[2]["page"].getInt == 30
+
+  test "returns empty for HTML without .widget-work":
+    let items = parseRanking("<html><body>empty</body></html>")
+    check items.len == 0
 
 suite "parseEpisodePage":
   test "extracts body content from episode HTML":
