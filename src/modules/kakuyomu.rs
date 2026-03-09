@@ -5,6 +5,16 @@ use serde_json::{json, Map, Value};
 
 const TYPE: &str = "kakuyomu";
 
+const RANKING_GENRES: &[(&str, &str)] = &[
+    ("異世界ファンタジー", "fantasy"),
+    ("現代ファンタジー", "action"),
+    ("SF", "sf"),
+    ("恋愛", "love_story"),
+    ("ラブコメ", "romance"),
+    ("現代ドラマ", "drama"),
+    ("ホラー", "horror"),
+];
+
 fn parse_apollo_state(html: &str) -> Result<Value, AppError> {
     let doc = Html::parse_document(html);
     let sel =
@@ -105,8 +115,15 @@ pub async fn fetch_ranking(
     let title_sel = Selector::parse(".bookWalker-work-title").unwrap();
     let ep_count_sel = Selector::parse(".widget-workCard-episodeCount").unwrap();
 
+    let rank_sel = Selector::parse(".widget-work-rank").unwrap();
+
     let mut result = Vec::new();
     for elem in doc.select(&work_sel) {
+        // Skip kakuyomu Next entries (no .widget-work-rank)
+        if elem.select(&rank_sel).next().is_none() {
+            continue;
+        }
+
         let title_el = elem.select(&title_sel).next();
         let id = title_el
             .and_then(|el| el.value().attr("href"))
@@ -140,10 +157,18 @@ pub async fn fetch_ranking_list(
             "kakuyomu does not support quarter ranking".to_string(),
         ));
     }
-    let data = fetch_ranking(client, "all", period).await?;
-    let mut result = Map::new();
-    result.insert("総合".to_string(), Value::Array(data));
-    Ok(Value::Object(result))
+    let futures: Vec<_> = RANKING_GENRES
+        .iter()
+        .map(|(_, slug)| fetch_ranking(client, slug, period))
+        .collect();
+    let results = futures::future::join_all(futures).await;
+
+    let mut map = Map::new();
+    for (i, res) in results.into_iter().enumerate() {
+        let data = res?;
+        map.insert(RANKING_GENRES[i].0.to_string(), Value::Array(data));
+    }
+    Ok(Value::Object(map))
 }
 
 pub async fn fetch_search(client: &reqwest::Client, word: &str) -> Result<Value, AppError> {
