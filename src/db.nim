@@ -7,8 +7,6 @@ proc open*(path: string): DbConn =
 
   result.exec(sql"PRAGMA journal_mode = WAL")
   result.exec(sql"PRAGMA synchronous = NORMAL")
-  result.exec(sql"PRAGMA cache_size = -64000")
-  result.exec(sql"PRAGMA temp_store = MEMORY")
 
   result.exec(sql"""
     CREATE TABLE IF NOT EXISTS favorites (
