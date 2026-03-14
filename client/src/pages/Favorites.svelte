@@ -150,7 +150,7 @@
 								<span class="card-info">{fav.read} / {fav.page}{#if fav.novelupdated_at} <span class="card-updated">{formatDate(fav.novelupdated_at)}</span>{/if}</span>
 								<span class="card-type" style:--type-color={typeColors[fav.type]}>{fav.type}</span>
 							</div>
-							<div class="card-title"><a href={link(`/novel/${fav.type}/${fav.id}/${fav.read || 1}`)}>{decodeHtml(fav.title)}</a></div>
+							<div class="card-title"><a href={link(`/novel/${fav.type}/${fav.id}/${Math.min((fav.read || 0) + 1, fav.page || 1)}`)}>{decodeHtml(fav.title)}</a></div>
 						</div>
 						<div class="card-actions">
 							<button class="delete-btn" onclick={() => confirmDelete(fav)}>✕</button>
