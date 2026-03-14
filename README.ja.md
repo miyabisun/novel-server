@@ -43,5 +43,4 @@ cargo run --release
 ## 詳細ドキュメント
 
 - [開発ガイド](docs/development.md) — ローカルでの開発・ビルド方法
-- [API リファレンス](docs/api.md) — REST API の仕様
-- [アーキテクチャ](docs/architecture.md) — バックエンド / フロントエンドの構成
+- API リファレンス — サーバー起動後 `/swagger-ui/` で閲覧可能

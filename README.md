@@ -44,5 +44,4 @@ The database is automatically created on first startup.
 ## Documentation
 
 - [Development Guide](docs/development.md) — Local setup, build, and project structure
-- [API Reference](docs/api.md) — REST API specification
-- [Architecture](docs/architecture.md) — Backend / frontend architecture overview
+- API Reference — Available at `/swagger-ui/` when the server is running
