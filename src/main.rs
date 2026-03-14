@@ -3,6 +3,7 @@ mod config;
 mod db;
 mod error;
 mod modules;
+mod openapi;
 mod routes;
 mod sanitize;
 mod spa;

@@ -23,10 +23,7 @@ pub fn routes() -> Router<AppState> {
         .route("/api/favorites", get(get_favorites))
         .route("/api/favorites/{type}/{id}", put(put_favorite))
         .route("/api/favorites/{type}/{id}", delete(delete_favorite))
-        .route(
-            "/api/favorites/{type}/{id}/progress",
-            patch(patch_progress),
-        )
+        .route("/api/favorites/{type}/{id}/progress", patch(patch_progress))
 }
 
 #[derive(Deserialize)]
@@ -41,6 +38,18 @@ struct ProgressBody {
     read: Option<i64>,
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/favorites",
+    tag = "お気に入り",
+    summary = "お気に入り一覧取得",
+    description = "お気に入りに登録された小説の一覧を取得する。小説更新日時の降順でソートされる（更新日時のないものは末尾）。キャッシュなし。",
+    responses(
+        (status = 200, description = "お気に入り一覧", body = Vec<crate::openapi::Favorite>,
+            example = json!([{"type": "narou", "id": "n1234ab", "title": "小説タイトル", "novelupdated_at": "2026-02-15T00:00:00", "page": 150, "read": 42}])),
+        (status = 500, description = "DBエラー", body = crate::openapi::ErrorResponse),
+    ),
+)]
 async fn get_favorites(State(state): State<AppState>) -> Result<Json<Value>, AppError> {
     let rows = {
         let db = state.db.lock().unwrap();
@@ -55,6 +64,25 @@ async fn get_favorites(State(state): State<AppState>) -> Result<Json<Value>, App
     Ok(Json(Value::Array(rows)))
 }
 
+#[utoipa::path(
+    put,
+    path = "/api/favorites/{type}/{id}",
+    tag = "お気に入り",
+    summary = "お気に入り登録・更新",
+    description = "お気に入りを追加または更新する（UPSERT動作）。登録後、バックグラウンドで小説のメタデータを非同期取得し、タイトル・ページ数・更新日時を最新化する。",
+    params(
+        ("type" = String, Path, description = "対象サイト（narou / nocturne / kakuyomu）", example = "narou"),
+        ("id" = String, Path, description = "小説ID", example = "n1234ab"),
+    ),
+    request_body(content = crate::openapi::FavoriteRequest, description = "お気に入り情報。novelupdated_atは省略可",
+        example = json!({"title": "小説タイトル", "page": 150, "novelupdated_at": "2026-02-15T00:00:00"})),
+    responses(
+        (status = 200, description = "作成/更新されたお気に入り", body = crate::openapi::Favorite),
+        (status = 400, description = "必須フィールド不足", body = crate::openapi::ErrorResponse,
+            example = json!({"error": "title and page are required"})),
+        (status = 500, description = "DBエラー", body = crate::openapi::ErrorResponse),
+    ),
+)]
 async fn put_favorite(
     State(state): State<AppState>,
     Path((type_str, id)): Path<(String, String)>,
@@ -89,11 +117,7 @@ async fn put_favorite(
     tokio::spawn(async move {
         match module.fetch_datum(&state_clone.http, &id_clone).await {
             Ok(datum) => {
-                crate::sync::update_favorite_from_datum(
-                    &state_clone.db,
-                    &type_clone,
-                    &datum,
-                );
+                crate::sync::update_favorite_from_datum(&state_clone.db, &type_clone, &datum);
                 tracing::info!("[sync] initial fetch for {}/{}", type_clone, id_clone);
             }
             Err(e) => {
@@ -110,6 +134,23 @@ async fn put_favorite(
     Ok(Json(favorite))
 }
 
+#[utoipa::path(
+    delete,
+    path = "/api/favorites/{type}/{id}",
+    tag = "お気に入り",
+    summary = "お気に入り削除",
+    description = "お気に入りを削除する。",
+    params(
+        ("type" = String, Path, description = "対象サイト", example = "narou"),
+        ("id" = String, Path, description = "小説ID", example = "n1234ab"),
+    ),
+    responses(
+        (status = 200, description = "削除成功", body = crate::openapi::OkResponse,
+            example = json!({"ok": true})),
+        (status = 404, description = "お気に入りが存在しない", body = crate::openapi::ErrorResponse),
+        (status = 500, description = "DBエラー", body = crate::openapi::ErrorResponse),
+    ),
+)]
 async fn delete_favorite(
     State(state): State<AppState>,
     Path((type_str, id)): Path<(String, String)>,
@@ -128,6 +169,25 @@ async fn delete_favorite(
     Ok(Json(json!({ "ok": true })))
 }
 
+#[utoipa::path(
+    patch,
+    path = "/api/favorites/{type}/{id}/progress",
+    tag = "お気に入り",
+    summary = "既読位置更新",
+    description = "既読ページ位置を更新する。お気に入りに登録されていない場合は何もせず `{\"ok\": true}` を返す。",
+    params(
+        ("type" = String, Path, description = "対象サイト", example = "narou"),
+        ("id" = String, Path, description = "小説ID", example = "n1234ab"),
+    ),
+    request_body(content = crate::openapi::ProgressRequest, description = "既読ページ番号",
+        example = json!({"read": 42})),
+    responses(
+        (status = 200, description = "更新されたお気に入り（未登録の場合は {ok: true}）", body = crate::openapi::Favorite),
+        (status = 400, description = "readフィールド不足", body = crate::openapi::ErrorResponse,
+            example = json!({"error": "read is required"})),
+        (status = 500, description = "DBエラー", body = crate::openapi::ErrorResponse),
+    ),
+)]
 async fn patch_progress(
     State(state): State<AppState>,
     Path((type_str, id)): Path<(String, String)>,

@@ -30,7 +30,10 @@ pub fn get_index_html(base_path: &str) -> Option<String> {
 
     let raw = fs::read_to_string(index_path).ok()?;
     let html = raw
-        .replace("<head>", &format!("<head>\n\t\t<base href=\"{}/\">", base_path))
+        .replace(
+            "<head>",
+            &format!("<head>\n\t\t<base href=\"{}/\">", base_path),
+        )
         .replace(
             "window.__BASE_PATH__ = \"\"",
             &format!(

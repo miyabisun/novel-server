@@ -22,6 +22,24 @@ pub fn routes() -> Router<AppState> {
         .route("/api/novel/{type}/ranking", patch(patch_ranking))
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/novel/{type}/ranking",
+    tag = "ランキング",
+    summary = "ランキング取得",
+    description = "指定サイトのランキングをジャンル別にグループ化して取得する。結果は3時間キャッシュされる。\n\n## 対応サイト\n- **narou**: 小説家になろう（daily/weekly/monthly/quarter/yearly）\n- **nocturne**: ノクターンノベルズ（daily/weekly/monthly/quarter/yearly）\n- **kakuyomu**: カクヨム（daily/weekly/monthly/yearly）※ quarterは非対応",
+    params(
+        ("type" = String, Path, description = "対象サイト（narou / nocturne / kakuyomu）", example = "narou"),
+        ("period" = Option<String>, Query, description = "期間（デフォルト: daily）", example = "daily"),
+    ),
+    responses(
+        (status = 200, description = "ジャンル名をキーとし各ジャンルに小説の配列が入ったオブジェクト", body = Object,
+            example = json!({"異世界〔恋愛〕": [{"id": "n1234ab", "title": "小説タイトル", "page": 150, "noveltype": 1}]})),
+        (status = 400, description = "無効なパラメータ", body = crate::openapi::ErrorResponse,
+            example = json!({"error": "Invalid period"})),
+        (status = 502, description = "外部サイトからの取得に失敗", body = crate::openapi::ErrorResponse),
+    ),
+)]
 async fn get_ranking(
     State(state): State<AppState>,
     Path(type_str): Path<String>,
@@ -30,6 +48,22 @@ async fn get_ranking(
     fetch_ranking(state, &type_str, query.period.as_deref(), true).await
 }
 
+#[utoipa::path(
+    patch,
+    path = "/api/novel/{type}/ranking",
+    tag = "ランキング",
+    summary = "ランキング再取得（キャッシュ無視）",
+    description = "キャッシュを無視してランキングを再取得する。パラメータ・レスポンス形式はGETと同一。",
+    params(
+        ("type" = String, Path, description = "対象サイト", example = "narou"),
+        ("period" = Option<String>, Query, description = "期間（デフォルト: daily）", example = "weekly"),
+    ),
+    responses(
+        (status = 200, description = "ランキングデータ", body = Object),
+        (status = 400, description = "無効なパラメータ", body = crate::openapi::ErrorResponse),
+        (status = 502, description = "外部サイトからの取得に失敗", body = crate::openapi::ErrorResponse),
+    ),
+)]
 async fn patch_ranking(
     State(state): State<AppState>,
     Path(type_str): Path<String>,

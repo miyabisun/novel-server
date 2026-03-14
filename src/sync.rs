@@ -5,6 +5,11 @@ use serde_json::Value;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+/// お気に入りのメタデータをバックグラウンドで定期同期する。
+///
+/// - narou / nocturne: API で複数 ID を一括取得できるため固定間隔の interval（10分）で十分。
+/// - kakuyomu: HTML スクレイピングで 1 件ずつしか取得できないため、件数に応じて
+///   sleep(3,600,000ms / count) で 1 時間かけて全件を均等に巡回する。
 pub fn start_sync(state: AppState) {
     tracing::info!("[sync] starting background sync");
     start_syosetu_sync(state.clone(), ModuleType::Narou, Duration::from_secs(600));
@@ -35,12 +40,10 @@ fn get_ids(db: &Arc<Mutex<Connection>>, type_str: &str) -> Vec<String> {
     result
 }
 
-/// Update a single favorite record with fetched datum
-pub fn update_favorite_from_datum(
-    db: &Arc<Mutex<Connection>>,
-    type_str: &str,
-    datum: &Value,
-) {
+/// Update a single favorite record with fetched datum.
+/// `datum` must contain at least: `id` (string), `title` (string),
+/// `pages` (array, length used as page count), `novelupdated_at` (string, optional).
+pub fn update_favorite_from_datum(db: &Arc<Mutex<Connection>>, type_str: &str, datum: &Value) {
     let id = datum["id"].as_str().unwrap_or_default();
     let title = datum["title"].as_str();
     let page = datum["pages"].as_array().map(|a| a.len() as i64);
@@ -143,12 +146,7 @@ fn start_kakuyomu_sync(state: AppState) {
             match module.fetch_datum(&state.http, &id).await {
                 Ok(datum) => {
                     update_favorite_from_datum(&state.db, type_str, &datum);
-                    tracing::info!(
-                        "[sync] kakuyomu: updated {} ({}/{})",
-                        id,
-                        index + 1,
-                        count
-                    );
+                    tracing::info!("[sync] kakuyomu: updated {} ({}/{})", id, index + 1, count);
                     index += 1;
                     let interval_ms = 3_600_000u64 / count as u64;
                     tokio::time::sleep(Duration::from_millis(interval_ms)).await;

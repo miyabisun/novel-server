@@ -4,6 +4,8 @@ pub mod syosetu;
 use crate::error::AppError;
 use serde_json::Value;
 
+/// サイト種別の enum dispatch。trait objects より単純で型安全。
+/// 各メソッドの match アームでサイト固有のモジュールに委譲する。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ModuleType {
     Narou,
@@ -36,8 +38,12 @@ impl ModuleType {
         period: &str,
     ) -> Result<Value, AppError> {
         match self {
-            Self::Narou => syosetu::fetch_ranking_list(&syosetu::NAROU, client, limit, period).await,
-            Self::Nocturne => syosetu::fetch_ranking_list(&syosetu::NOCTURNE, client, limit, period).await,
+            Self::Narou => {
+                syosetu::fetch_ranking_list(&syosetu::NAROU, client, limit, period).await
+            }
+            Self::Nocturne => {
+                syosetu::fetch_ranking_list(&syosetu::NOCTURNE, client, limit, period).await
+            }
             Self::Kakuyomu => kakuyomu::fetch_ranking_list(client, period).await,
         }
     }
@@ -79,11 +85,7 @@ impl ModuleType {
         }
     }
 
-    pub async fn fetch_toc(
-        &self,
-        client: &reqwest::Client,
-        id: &str,
-    ) -> Result<Value, AppError> {
+    pub async fn fetch_toc(&self, client: &reqwest::Client, id: &str) -> Result<Value, AppError> {
         match self {
             Self::Narou => syosetu::fetch_toc(&syosetu::NAROU, client, id).await,
             Self::Nocturne => syosetu::fetch_toc(&syosetu::NOCTURNE, client, id).await,
@@ -103,11 +105,7 @@ impl ModuleType {
         }
     }
 
-    pub async fn fetch_datum(
-        &self,
-        client: &reqwest::Client,
-        id: &str,
-    ) -> Result<Value, AppError> {
+    pub async fn fetch_datum(&self, client: &reqwest::Client, id: &str) -> Result<Value, AppError> {
         match self {
             Self::Narou => syosetu::fetch_datum(&syosetu::NAROU, client, id).await,
             Self::Nocturne => syosetu::fetch_datum(&syosetu::NOCTURNE, client, id).await,

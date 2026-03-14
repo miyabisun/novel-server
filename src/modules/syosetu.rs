@@ -111,9 +111,8 @@ pub fn parse_toc(html: &str) -> TocResult {
     let ep_sel = Selector::parse(".p-eplist__sublist").unwrap();
     let a_sel = Selector::parse("a").unwrap();
     let mut episodes = Vec::new();
-    let mut num = 0u64;
-    for el in doc.select(&ep_sel) {
-        num += 1;
+    for (i, el) in doc.select(&ep_sel).enumerate() {
+        let num = (i as u64) + 1;
         let ep_title = el
             .select(&a_sel)
             .next()
@@ -305,7 +304,9 @@ pub async fn fetch_ranking_list(
 
     let mut result = serde_json::Map::new();
     for (i, handle) in handles.into_iter().enumerate() {
-        let data = handle.await.map_err(|e| AppError::Internal(e.to_string()))??;
+        let data = handle
+            .await
+            .map_err(|e| AppError::Internal(e.to_string()))??;
         result.insert(site.ranking_genres[i].0.to_string(), Value::Array(data));
     }
     Ok(Value::Object(result))
@@ -319,10 +320,7 @@ pub async fn fetch_datum(
     let data = site_api(
         site,
         client,
-        &[
-            ("of", OF_DATUM.to_string()),
-            ("ncode", id.to_string()),
-        ],
+        &[("of", OF_DATUM.to_string()), ("ncode", id.to_string())],
     )
     .await?;
     data.first()
@@ -339,10 +337,7 @@ pub async fn fetch_data(
     let data = site_api(
         site,
         client,
-        &[
-            ("of", OF_DATUM.to_string()),
-            ("ncode", ncode_str),
-        ],
+        &[("of", OF_DATUM.to_string()), ("ncode", ncode_str)],
     )
     .await?;
     Ok(data.iter().map(|d| to_datum(site, d)).collect())
@@ -356,10 +351,7 @@ pub async fn fetch_detail(
     let data = site_api(
         site,
         client,
-        &[
-            ("of", OF_DETAIL.to_string()),
-            ("ncode", id.to_string()),
-        ],
+        &[("of", OF_DETAIL.to_string()), ("ncode", id.to_string())],
     )
     .await?;
     let item = data
@@ -432,7 +424,9 @@ pub async fn fetch_toc(
 
     let mut all_titles: Vec<String> = first.episodes.into_iter().map(|e| e.title).collect();
     for handle in handles {
-        let episodes = handle.await.map_err(|e| AppError::Internal(e.to_string()))??;
+        let episodes = handle
+            .await
+            .map_err(|e| AppError::Internal(e.to_string()))??;
         for ep in episodes {
             all_titles.push(ep.title);
         }
@@ -560,19 +554,37 @@ mod tests {
 
     #[test]
     fn of_ranking_uses_hyphens() {
-        assert!(!OF_RANKING.contains(','), "OF_RANKING must not contain commas: {OF_RANKING}");
-        assert!(OF_RANKING.contains('-'), "OF_RANKING must use hyphen separators: {OF_RANKING}");
+        assert!(
+            !OF_RANKING.contains(','),
+            "OF_RANKING must not contain commas: {OF_RANKING}"
+        );
+        assert!(
+            OF_RANKING.contains('-'),
+            "OF_RANKING must use hyphen separators: {OF_RANKING}"
+        );
     }
 
     #[test]
     fn of_datum_uses_hyphens() {
-        assert!(!OF_DATUM.contains(','), "OF_DATUM must not contain commas: {OF_DATUM}");
-        assert!(OF_DATUM.contains('-'), "OF_DATUM must use hyphen separators: {OF_DATUM}");
+        assert!(
+            !OF_DATUM.contains(','),
+            "OF_DATUM must not contain commas: {OF_DATUM}"
+        );
+        assert!(
+            OF_DATUM.contains('-'),
+            "OF_DATUM must use hyphen separators: {OF_DATUM}"
+        );
     }
 
     #[test]
     fn of_detail_uses_hyphens() {
-        assert!(!OF_DETAIL.contains(','), "OF_DETAIL must not contain commas: {OF_DETAIL}");
-        assert!(OF_DETAIL.contains('-'), "OF_DETAIL must use hyphen separators: {OF_DETAIL}");
+        assert!(
+            !OF_DETAIL.contains(','),
+            "OF_DETAIL must not contain commas: {OF_DETAIL}"
+        );
+        assert!(
+            OF_DETAIL.contains('-'),
+            "OF_DETAIL must use hyphen separators: {OF_DETAIL}"
+        );
     }
 }

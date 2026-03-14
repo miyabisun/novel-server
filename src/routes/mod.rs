@@ -6,6 +6,7 @@ mod search;
 mod toc;
 
 use crate::error::AppError;
+use crate::openapi;
 use crate::spa;
 use crate::state::AppState;
 use axum::http::StatusCode;
@@ -14,7 +15,54 @@ use axum::routing::get;
 use axum::Router;
 use std::future::Future;
 use tower_http::services::ServeDir;
+use utoipa::OpenApi;
+use utoipa_swagger_ui::SwaggerUi;
 
+#[derive(OpenApi)]
+#[openapi(
+    info(
+        title = "Novel Server API",
+        version = "0.1.0",
+        description = "小説家になろう・ノクターンノベルズ・カクヨムの小説を横断的に検索・閲覧するためのAPI。\n\n## キャッシュ戦略\n| 対象 | TTL | 説明 |\n|------|-----|------|\n| ランキング | 3時間 | 各サイトのランキングは頻繁には更新されない |\n| 検索結果 | 1時間 | 新作投稿を早めに反映するため短めのTTL |\n| 小説詳細 | 24時間 | タイトル・あらすじは基本的に変わらない |\n| ページ本文 | 24時間 | 小説の本文は基本的に変わらない |\n| 目次 | なし | リアルタイム性を重視（最新の話数を即時反映） |\n\nキャッシュの強制更新は各エンドポイントのPATCHメソッドで行えます。\n\n## リトライ\n小説詳細・目次・ページ本文の取得は最大3回リトライされます（500ms × 試行回数のバックオフ）。\n\n## HTMLサニタイズ\nページ本文のHTMLは許可リスト方式でサニタイズされます。許可タグ: p, br, hr, div, span, h1-h6, ruby, rt, rp, rb, em, strong, b, i, u, s, sub, sup。全属性は除去されます。",
+    ),
+    paths(
+        ranking::get_ranking,
+        ranking::patch_ranking,
+        search::get_search,
+        detail::get_detail,
+        toc::get_toc,
+        pages::get_page,
+        pages::patch_page,
+        favorites::get_favorites,
+        favorites::put_favorite,
+        favorites::delete_favorite,
+        favorites::patch_progress,
+    ),
+    components(schemas(
+        openapi::ErrorResponse,
+        openapi::RankingItem,
+        openapi::SearchItem,
+        openapi::DetailResponse,
+        openapi::Episode,
+        openapi::TocResponse,
+        openapi::PageResponse,
+        openapi::Favorite,
+        openapi::FavoriteRequest,
+        openapi::ProgressRequest,
+        openapi::OkResponse,
+    )),
+    tags(
+        (name = "ランキング", description = "ランキング取得・再取得"),
+        (name = "検索", description = "小説のキーワード検索"),
+        (name = "小説情報", description = "小説の詳細情報・目次の取得"),
+        (name = "小説本文", description = "小説の本文HTML取得"),
+        (name = "お気に入り", description = "お気に入りのCRUD操作・既読管理"),
+    ),
+)]
+struct ApiDoc;
+
+/// リトライはルートハンドラ層のみが担う。モジュール層は単純な fetch に徹し、
+/// バックグラウンド同期はループ継続で暗黙的に再試行される。
 async fn with_retry<F, Fut, T>(label: &str, f: F) -> Result<T, AppError>
 where
     F: Fn() -> Fut,
@@ -32,7 +80,10 @@ where
             }
         }
     }
-    Err(AppError::Upstream(format!("Failed after 3 retries: {}", label)))
+    Err(AppError::Upstream(format!(
+        "Failed after 3 retries: {}",
+        label
+    )))
 }
 
 pub fn build_router(state: AppState) -> Router {
@@ -48,6 +99,7 @@ pub fn build_router(state: AppState) -> Router {
 
     let sub = Router::new()
         .merge(api)
+        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .nest_service("/assets", ServeDir::new("client/build/assets"))
         .nest_service(
             "/favicon.svg",
