@@ -10,7 +10,10 @@ RUN npx vite build
 FROM rust:1-slim AS backend
 RUN apt-get update && apt-get install -y pkg-config libssl-dev curl && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
+# Build dependencies first (cached unless Cargo.toml/Cargo.lock change)
 COPY Cargo.toml Cargo.lock ./
+RUN mkdir src && echo 'fn main() {}' > src/main.rs && cargo build --release && rm -rf src
+# Build the actual source (only this layer re-runs on code changes)
 COPY src/ src/
 RUN cargo build --release
 
