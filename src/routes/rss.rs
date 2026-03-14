@@ -24,7 +24,7 @@ struct FeedItem {
     path = "/api/rss",
     tag = "RSS",
     summary = "お気に入り更新RSSフィード",
-    description = "お気に入り小説のうち、未読が5話未満（総ページ数 - 既読ページ < 5）の小説の更新情報をRSS 2.0形式で配信する。更新日時の降順。",
+    description = "お気に入り小説のうち、未読が1〜9話（0 < 総ページ数 - 既読ページ < 10）の小説の更新情報をRSS 2.0形式で配信する。更新日時の降順。読み切った小説は表示されない。",
     responses(
         (status = 200, description = "RSS 2.0 XML", content_type = "application/rss+xml"),
         (status = 500, description = "DBエラー", body = crate::openapi::ErrorResponse),
@@ -38,7 +38,7 @@ async fn get_rss(
         let db = state.db.lock().unwrap();
         let mut stmt = db.prepare(
             "SELECT type, id, title, novelupdated_at, page, read FROM favorites
-             WHERE page - read < 5
+             WHERE page - read > 0 AND page - read < 10
              ORDER BY novelupdated_at DESC NULLS LAST",
         )?;
         let rows = stmt.query_map([], |row| {
