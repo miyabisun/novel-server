@@ -2,6 +2,7 @@ mod detail;
 mod favorites;
 mod pages;
 mod ranking;
+mod rss;
 mod search;
 mod toc;
 
@@ -37,6 +38,7 @@ use utoipa_swagger_ui::SwaggerUi;
         favorites::put_favorite,
         favorites::delete_favorite,
         favorites::patch_progress,
+        rss::get_rss,
     ),
     components(schemas(
         openapi::ErrorResponse,
@@ -57,12 +59,13 @@ use utoipa_swagger_ui::SwaggerUi;
         (name = "小説情報", description = "小説の詳細情報・目次の取得"),
         (name = "小説本文", description = "小説の本文HTML取得"),
         (name = "お気に入り", description = "お気に入りのCRUD操作・既読管理"),
+        (name = "RSS", description = "お気に入り更新のRSSフィード"),
     ),
 )]
 struct ApiDoc;
 
-/// リトライはルートハンドラ層のみが担う。モジュール層は単純な fetch に徹し、
-/// バックグラウンド同期はループ継続で暗黙的に再試行される。
+/// Only the route handler layer retries. Module layer does plain fetch;
+/// background sync retries implicitly by continuing its loop.
 async fn with_retry<F, Fut, T>(label: &str, f: F) -> Result<T, AppError>
 where
     F: Fn() -> Fut,
@@ -95,7 +98,8 @@ pub fn build_router(state: AppState) -> Router {
         .merge(detail::routes())
         .merge(favorites::routes())
         .merge(search::routes())
-        .merge(toc::routes());
+        .merge(toc::routes())
+        .merge(rss::routes());
 
     let sub = Router::new()
         .merge(api)

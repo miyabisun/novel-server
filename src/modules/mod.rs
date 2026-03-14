@@ -4,8 +4,8 @@ pub mod syosetu;
 use crate::error::AppError;
 use serde_json::Value;
 
-/// サイト種別の enum dispatch。trait objects より単純で型安全。
-/// 各メソッドの match アームでサイト固有のモジュールに委譲する。
+/// Site type enum dispatch — simpler and more type-safe than trait objects.
+/// Each method's match arm delegates to a site-specific module.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ModuleType {
     Narou,

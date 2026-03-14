@@ -5,11 +5,11 @@ use serde_json::Value;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-/// お気に入りのメタデータをバックグラウンドで定期同期する。
+/// Periodically sync favorite metadata in the background.
 ///
-/// - narou / nocturne: API で複数 ID を一括取得できるため固定間隔の interval（10分）で十分。
-/// - kakuyomu: HTML スクレイピングで 1 件ずつしか取得できないため、件数に応じて
-///   sleep(3,600,000ms / count) で 1 時間かけて全件を均等に巡回する。
+/// - narou / nocturne: Bulk API fetch supports multiple IDs, so a fixed interval (10 min) suffices.
+/// - kakuyomu: HTML scraping fetches one at a time, so sleep(3,600,000ms / count)
+///   distributes requests evenly over 1 hour.
 pub fn start_sync(state: AppState) {
     tracing::info!("[sync] starting background sync");
     start_syosetu_sync(state.clone(), ModuleType::Narou, Duration::from_secs(600));

@@ -14,9 +14,9 @@ static SANITIZER: LazyLock<Builder<'static>> = LazyLock::new(|| {
         .into_iter()
         .collect();
 
-    // 全属性を一律削除する。スクレイピング元 HTML には onclick, onerror 等の
-    // イベントハンドラ属性が含まれる可能性があり、属性を個別に許可/拒否する
-    // 方式は漏れのリスクがあるため。
+    // Strip all attributes unconditionally. Scraped HTML may contain event handler
+    // attributes (onclick, onerror, etc.), and an allow/deny-list approach for
+    // individual attributes risks omissions.
     let mut builder = Builder::default();
     builder
         .tags(allowed)
