@@ -14,8 +14,10 @@ WORKDIR /app
 COPY Cargo.toml Cargo.lock ./
 RUN mkdir src && echo 'fn main() {}' > src/main.rs && cargo build --release && rm -rf src
 # Build the actual source (only this layer re-runs on code changes)
+# touch: Docker COPY preserves host timestamps, which may be older than
+# the cached dependency build above, causing cargo to skip the rebuild.
 COPY src/ src/
-RUN cargo build --release
+RUN touch src/main.rs && cargo build --release
 
 # Stage 3: Production runtime
 FROM debian:bookworm-slim
