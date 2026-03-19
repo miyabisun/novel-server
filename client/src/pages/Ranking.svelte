@@ -108,7 +108,8 @@
 
 	function updateFavIds(id) {
 		const next = new Set(favIds);
-		next.has(id) ? next.delete(id) : next.add(id);
+		if (next.has(id)) next.delete(id)
+		else next.add(id)
 		favIds = next;
 	}
 

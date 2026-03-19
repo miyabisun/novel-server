@@ -16,7 +16,7 @@ Open `http://localhost:3000` in your browser.
 ## Quick Start (Rust)
 
 ```bash
-cd client && npm install && npx vite build && cd ..
+cd client && npm install && npm run build && cd ..
 cargo run --release
 ```
 

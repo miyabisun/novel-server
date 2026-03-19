@@ -15,7 +15,7 @@ docker run -p 3000:3000 -v novel-data:/data ghcr.io/miyabisun/novel-server:lates
 ## Quick Start (Rust)
 
 ```bash
-cd client && npm install && npx vite build && cd ..
+cd client && npm install && npm run build && cd ..
 cargo run --release
 ```
 

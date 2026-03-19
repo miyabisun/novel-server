@@ -14,7 +14,7 @@
 
 ```bash
 # フロントエンドの依存インストール + ビルド
-cd client && npm install && npx vite build && cd ..
+cd client && npm install && npm run build && cd ..
 
 # .env を作成
 cp .env.example .env
@@ -35,13 +35,15 @@ bin/dev
 
 `http://localhost:3000` にアクセスするとアプリケーションが表示されます。
 
-> **注意:** フロントエンドの変更時は `cd client && npx vite build` でリビルドしてください。
+> **注意:** フロントエンドの変更時は `cd client && npm run build` でリビルドしてください。
 
 ## コマンド一覧
 
 | コマンド | 説明 |
 |---------|------|
-| `cd client && npm install && npx vite build` | フロントエンドセットアップ + ビルド |
+| `cd client && npm install && npm run build` | フロントエンドセットアップ + ビルド |
+| `cd client && npm run fmt` | フロントエンドコードフォーマット (oxfmt) |
+| `cd client && npm run lint` | フロントエンド lint (oxlint) |
 | `cargo run` | 開発サーバー起動 |
 | `cargo run --release` | 本番サーバー起動 |
 | `cargo build --release` | リリースビルド |

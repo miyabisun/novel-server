@@ -4,7 +4,7 @@ WORKDIR /app/client
 COPY client/package.json client/package-lock.json ./
 RUN npm ci
 COPY client/ .
-RUN npx vite build
+RUN npm run build
 
 # Stage 2: Rust build
 FROM rust:1-slim AS backend
