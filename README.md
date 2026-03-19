@@ -40,6 +40,7 @@ The database is automatically created on first startup.
 - **Reader** — Keyboard-navigable (arrow keys) page turning
 - **Favorites** — Add from rankings with ★, auto-sync metadata (page count, update time)
 - **Reading Progress** — Automatically saved when a page loads in the reader
+- **Multi-user** — When deployed behind an OAuth2 proxy that sets `X-Forwarded-Email`, favorites and reading progress are automatically scoped per user. Without the header, operates as a single guest user (backward compatible).
 
 ## Documentation
 

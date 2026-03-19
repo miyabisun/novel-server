@@ -1,3 +1,4 @@
+mod auth;
 mod detail;
 mod favorites;
 mod pages;
@@ -11,6 +12,7 @@ use crate::openapi;
 use crate::spa;
 use crate::state::AppState;
 use axum::http::StatusCode;
+use axum::middleware;
 use axum::response::{Html, IntoResponse};
 use axum::routing::get;
 use axum::Router;
@@ -39,6 +41,7 @@ use utoipa_swagger_ui::SwaggerUi;
         favorites::delete_favorite,
         favorites::patch_progress,
         rss::get_rss,
+        auth::get_me,
     ),
     components(schemas(
         openapi::ErrorResponse,
@@ -52,6 +55,7 @@ use utoipa_swagger_ui::SwaggerUi;
         openapi::FavoriteRequest,
         openapi::ProgressRequest,
         openapi::OkResponse,
+        openapi::UserInfo,
     )),
     tags(
         (name = "ランキング", description = "ランキング取得・再取得"),
@@ -60,6 +64,7 @@ use utoipa_swagger_ui::SwaggerUi;
         (name = "小説本文", description = "小説の本文HTML取得"),
         (name = "お気に入り", description = "お気に入りのCRUD操作・既読管理"),
         (name = "RSS", description = "お気に入り更新のRSSフィード"),
+        (name = "認証", description = "ユーザー認証情報"),
     ),
 )]
 struct ApiDoc;
@@ -99,7 +104,12 @@ pub fn build_router(state: AppState) -> Router {
         .merge(favorites::routes())
         .merge(search::routes())
         .merge(toc::routes())
-        .merge(rss::routes());
+        .merge(rss::routes())
+        .merge(auth::routes())
+        .layer(middleware::from_fn_with_state(
+            state.db.clone(),
+            crate::auth::resolve_user,
+        ));
 
     let sub = Router::new()
         .merge(api)

@@ -1,6 +1,8 @@
 <script>
+	import { onMount } from 'svelte';
 	import { router, link } from '$lib/router.svelte.js';
 	import { typeColors } from '$lib/constants.js';
+	import fetcher from '$lib/fetcher.js';
 
 	const navItems = [
 		{ label: 'favorite', href: '/', color: 'rgba(220, 180, 50, 0.7)' },
@@ -8,6 +10,15 @@
 		{ label: 'kakuyomu', href: '/ranking/kakuyomu', color: typeColors.kakuyomu },
 		{ label: 'nocturne', href: '/ranking/nocturne', color: typeColors.nocturne },
 	];
+
+	let email = $state(null);
+
+	onMount(async () => {
+		const res = await fetcher('/api/auth/me').catch(() => null);
+		if (res?.email && res.email !== 'guest') {
+			email = res.email;
+		}
+	});
 
 	function isActive(item) {
 		if (item.href === '/') return router.index === 0;
@@ -27,6 +38,9 @@
 			>{item.label}</a>
 		{/each}
 	</nav>
+	{#if email}
+		<span class="nav-right">{email}</span>
+	{/if}
 </header>
 
 <style lang="sass">
@@ -45,6 +59,15 @@ header
 	display: flex
 	align-items: center
 	gap: 0
+
+.nav-right
+	color: var(--c-text-muted)
+	font-size: var(--fs-sm)
+	padding: var(--sp-3) 0
+	white-space: nowrap
+	overflow: hidden
+	text-overflow: ellipsis
+	max-width: 200px
 
 .title
 	color: var(--c-text-muted)

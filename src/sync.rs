@@ -23,7 +23,7 @@ pub fn start_sync(state: AppState) {
 
 fn get_ids(db: &Arc<Mutex<Connection>>, type_str: &str) -> Vec<String> {
     let conn = db.lock().unwrap();
-    let mut stmt = match conn.prepare("SELECT id FROM favorites WHERE type = ?1") {
+    let mut stmt = match conn.prepare("SELECT DISTINCT id FROM favorites WHERE type = ?1") {
         Ok(s) => s,
         Err(e) => {
             tracing::error!("[sync] {} db error: {}", type_str, e);

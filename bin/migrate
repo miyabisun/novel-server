@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [ $# -ne 2 ]; then
+  echo "Usage: bin/migrate <db_path> <email>" >&2
+  echo "" >&2
+  echo "Migrate old single-user schema to multi-user schema." >&2
+  echo "Existing favorites are assigned to the specified user." >&2
+  echo "" >&2
+  echo "Run this BEFORE starting the server with the new code." >&2
+  exit 1
+fi
+
+DB_PATH="$1"
+EMAIL="$2"
+
+if [ ! -f "$DB_PATH" ]; then
+  echo "Error: $DB_PATH not found" >&2
+  exit 1
+fi
+
+# Verify old schema (no users table)
+if sqlite3 "$DB_PATH" "SELECT 1 FROM users LIMIT 1" >/dev/null 2>&1; then
+  echo "Error: users table already exists — already migrated" >&2
+  exit 1
+fi
+
+# Verify old favorites table exists
+if ! sqlite3 "$DB_PATH" "SELECT 1 FROM favorites LIMIT 1" >/dev/null 2>&1; then
+  echo "Error: favorites table not found — not a valid old-schema DB" >&2
+  exit 1
+fi
+
+# Backup
+BAK_PATH="${DB_PATH}.bak"
+cp "$DB_PATH" "$BAK_PATH"
+echo "Backup: $BAK_PATH"
+
+# Count records before migration
+OLD_COUNT=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM favorites;")
+echo "Old schema: $OLD_COUNT favorites"
+
+# Create new DB alongside
+NEW_PATH="${DB_PATH}.new"
+rm -f "$NEW_PATH"
+
+sqlite3 "$NEW_PATH" <<'SCHEMA'
+PRAGMA journal_mode = WAL;
+PRAGMA foreign_keys = OFF;
+
+CREATE TABLE users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT NOT NULL UNIQUE
+);
+
+CREATE TABLE favorites (
+    user_id INTEGER NOT NULL DEFAULT 1,
+    type TEXT NOT NULL,
+    id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    novelupdated_at TEXT,
+    page INTEGER NOT NULL,
+    read INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, type, id),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+CREATE INDEX idx_favorites_updated ON favorites (user_id, novelupdated_at DESC);
+SCHEMA
+
+echo "New schema created: $NEW_PATH"
+
+# Migrate data
+sqlite3 "$NEW_PATH" <<MIGRATE
+ATTACH DATABASE '$BAK_PATH' AS old;
+
+BEGIN TRANSACTION;
+
+-- 1. Create guest user (id=1) and target user (id=2)
+INSERT INTO users (id, email) VALUES (1, 'guest');
+INSERT INTO users (id, email) VALUES (2, '$EMAIL');
+
+-- 2. Migrate favorites to the specified user
+INSERT INTO favorites (user_id, type, id, title, novelupdated_at, page, read)
+SELECT 2, type, id, title, novelupdated_at, page, read
+FROM old.favorites;
+
+COMMIT;
+
+DETACH DATABASE old;
+
+PRAGMA foreign_keys = ON;
+PRAGMA integrity_check;
+MIGRATE
+
+echo ""
+
+# Verify new DB
+NEW_USERS=$(sqlite3 "$NEW_PATH" "SELECT COUNT(*) FROM users;")
+NEW_FAVS=$(sqlite3 "$NEW_PATH" "SELECT COUNT(*) FROM favorites;")
+OWNER=$(sqlite3 "$NEW_PATH" "SELECT email FROM users WHERE id = 2;")
+echo "New schema: $NEW_USERS users, $NEW_FAVS favorites (owner: $OWNER)"
+
+# Swap
+mv "$NEW_PATH" "$DB_PATH"
+rm -f "${DB_PATH}-wal" "${DB_PATH}-shm"
+
+echo ""
+echo "Migration complete: $DB_PATH"
+echo "Backup preserved: $BAK_PATH"

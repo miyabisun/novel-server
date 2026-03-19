@@ -1,9 +1,10 @@
+use crate::auth::UserId;
 use crate::error::AppError;
 use crate::modules::ModuleType;
 use crate::state::AppState;
 use axum::extract::{Path, State};
 use axum::routing::{delete, get, patch, put};
-use axum::{Json, Router};
+use axum::{Extension, Json, Router};
 use serde::Deserialize;
 use serde_json::{json, Value};
 
@@ -50,14 +51,18 @@ struct ProgressBody {
         (status = 500, description = "DBエラー", body = crate::openapi::ErrorResponse),
     ),
 )]
-async fn get_favorites(State(state): State<AppState>) -> Result<Json<Value>, AppError> {
+async fn get_favorites(
+    State(state): State<AppState>,
+    Extension(user_id): Extension<UserId>,
+) -> Result<Json<Value>, AppError> {
     let rows = {
         let db = state.db.lock().unwrap();
         let mut stmt = db.prepare(
-            "SELECT type, id, title, novelupdated_at, page, read FROM favorites ORDER BY novelupdated_at DESC NULLS LAST",
+            "SELECT type, id, title, novelupdated_at, page, read FROM favorites
+             WHERE user_id = ?1 ORDER BY novelupdated_at DESC NULLS LAST",
         )?;
         let rows = stmt
-            .query_map([], map_favorite_row)?
+            .query_map([user_id.0], map_favorite_row)?
             .collect::<Result<Vec<Value>, _>>()?;
         rows
     };
@@ -85,6 +90,7 @@ async fn get_favorites(State(state): State<AppState>) -> Result<Json<Value>, App
 )]
 async fn put_favorite(
     State(state): State<AppState>,
+    Extension(user_id): Extension<UserId>,
     Path((type_str, id)): Path<(String, String)>,
     Json(body): Json<FavoriteBody>,
 ) -> Result<Json<Value>, AppError> {
@@ -100,14 +106,14 @@ async fn put_favorite(
     let favorite = {
         let db = state.db.lock().unwrap();
         db.execute(
-            "INSERT INTO favorites (type, id, title, page, novelupdated_at, read) VALUES (?1, ?2, ?3, ?4, ?5, 0)
-             ON CONFLICT(type, id) DO UPDATE SET title = ?3, page = ?4, novelupdated_at = ?5",
-            rusqlite::params![type_str, id, title, page, novelupdated_at],
+            "INSERT INTO favorites (user_id, type, id, title, page, novelupdated_at, read) VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0)
+             ON CONFLICT(user_id, type, id) DO UPDATE SET title = ?4, page = ?5, novelupdated_at = ?6",
+            rusqlite::params![user_id.0, type_str, id, title, page, novelupdated_at],
         )?;
         let mut stmt = db.prepare(
-            "SELECT type, id, title, novelupdated_at, page, read FROM favorites WHERE type = ?1 AND id = ?2",
+            "SELECT type, id, title, novelupdated_at, page, read FROM favorites WHERE user_id = ?1 AND type = ?2 AND id = ?3",
         )?;
-        stmt.query_row(rusqlite::params![type_str, id], map_favorite_row)?
+        stmt.query_row(rusqlite::params![user_id.0, type_str, id], map_favorite_row)?
     };
 
     // Fire-and-forget: fetch metadata immediately after adding
@@ -153,14 +159,15 @@ async fn put_favorite(
 )]
 async fn delete_favorite(
     State(state): State<AppState>,
+    Extension(user_id): Extension<UserId>,
     Path((type_str, id)): Path<(String, String)>,
 ) -> Result<Json<Value>, AppError> {
     ModuleType::resolve(&type_str)?;
     let changes = {
         let db = state.db.lock().unwrap();
         db.execute(
-            "DELETE FROM favorites WHERE type = ?1 AND id = ?2",
-            rusqlite::params![type_str, id],
+            "DELETE FROM favorites WHERE user_id = ?1 AND type = ?2 AND id = ?3",
+            rusqlite::params![user_id.0, type_str, id],
         )?
     };
     if changes == 0 {
@@ -190,6 +197,7 @@ async fn delete_favorite(
 )]
 async fn patch_progress(
     State(state): State<AppState>,
+    Extension(user_id): Extension<UserId>,
     Path((type_str, id)): Path<(String, String)>,
     Json(body): Json<ProgressBody>,
 ) -> Result<Json<Value>, AppError> {
@@ -201,16 +209,19 @@ async fn patch_progress(
     let result = {
         let db = state.db.lock().unwrap();
         let changes = db.execute(
-            "UPDATE favorites SET read = ?1 WHERE type = ?2 AND id = ?3",
-            rusqlite::params![read, type_str, id],
+            "UPDATE favorites SET read = ?1 WHERE user_id = ?2 AND type = ?3 AND id = ?4",
+            rusqlite::params![read, user_id.0, type_str, id],
         )?;
         if changes == 0 {
             return Ok(Json(json!({ "ok": true })));
         }
         let mut stmt = db.prepare(
-            "SELECT type, id, title, novelupdated_at, page, read FROM favorites WHERE type = ?1 AND id = ?2",
+            "SELECT type, id, title, novelupdated_at, page, read FROM favorites WHERE user_id = ?1 AND type = ?2 AND id = ?3",
         )?;
-        stmt.query_row(rusqlite::params![type_str, id], map_favorite_row)?
+        stmt.query_row(
+            rusqlite::params![user_id.0, type_str, id],
+            map_favorite_row,
+        )?
     };
     Ok(Json(result))
 }

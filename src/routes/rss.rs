@@ -1,10 +1,11 @@
+use crate::auth::UserId;
 use crate::error::AppError;
 use crate::state::AppState;
 use axum::extract::State;
 use axum::http::{header, HeaderMap};
 use axum::response::IntoResponse;
 use axum::routing::get;
-use axum::Router;
+use axum::{Extension, Router};
 
 pub fn routes() -> Router<AppState> {
     Router::new().route("/api/rss", get(get_rss))
@@ -32,16 +33,17 @@ struct FeedItem {
 )]
 async fn get_rss(
     State(state): State<AppState>,
+    Extension(user_id): Extension<UserId>,
     headers: HeaderMap,
 ) -> Result<impl IntoResponse, AppError> {
     let items = {
         let db = state.db.lock().unwrap();
         let mut stmt = db.prepare(
             "SELECT type, id, title, novelupdated_at, page, read FROM favorites
-             WHERE page - read > 0 AND page - read < 10
+             WHERE user_id = ?1 AND page - read > 0 AND page - read < 10
              ORDER BY novelupdated_at DESC NULLS LAST",
         )?;
-        let rows = stmt.query_map([], |row| {
+        let rows = stmt.query_map([user_id.0], |row| {
             Ok(FeedItem {
                 type_str: row.get(0)?,
                 id: row.get(1)?,

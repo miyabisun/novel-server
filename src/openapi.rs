@@ -112,3 +112,10 @@ pub struct ProgressRequest {
 pub struct OkResponse {
     pub ok: bool,
 }
+
+/// ユーザー情報
+#[derive(Serialize, ToSchema)]
+pub struct UserInfo {
+    /// メールアドレス（guest の場合は "guest"）
+    pub email: String,
+}
