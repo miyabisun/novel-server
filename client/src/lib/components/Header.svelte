@@ -69,6 +69,9 @@ header
 	text-overflow: ellipsis
 	max-width: 200px
 
+	@media (max-width: 799px)
+		display: none
+
 .title
 	color: var(--c-text-muted)
 	font-size: var(--fs-sm)
