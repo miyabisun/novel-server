@@ -1,10 +1,10 @@
 # Stage 1: Frontend build
-FROM node:22-slim AS frontend
+FROM oven/bun:1-slim AS frontend
 WORKDIR /app/client
-COPY client/package.json client/package-lock.json ./
-RUN npm ci
+COPY client/package.json client/bun.lock ./
+RUN bun install --frozen-lockfile
 COPY client/ .
-RUN npm run build
+RUN bun run build
 
 # Stage 2: Rust build
 FROM rust:1-slim AS backend
