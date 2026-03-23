@@ -320,25 +320,37 @@ pub async fn fetch_ranking_list(
         }));
     }
 
-    // Fetch overall ranking (no genre filter) in parallel
-    let overall_client = client.clone();
-    let overall_order = order.to_string();
-    let overall_handle = tokio::spawn(async move {
-        fetch_overall_ranking(site, &overall_client, limit, &overall_order).await
-    });
+    // Fetch overall ranking only for sites with multiple genres.
+    // For single-genre sites (e.g. nocturne), the genre IS the overall ranking,
+    // and fetching without genre filter would include unrelated works.
+    let overall_handle = if site.ranking_genres.len() > 1 {
+        let overall_client = client.clone();
+        let overall_order = order.to_string();
+        Some(tokio::spawn(async move {
+            fetch_overall_ranking(site, &overall_client, limit, &overall_order).await
+        }))
+    } else {
+        None
+    };
 
     let mut result = serde_json::Map::new();
-
-    let overall_data = overall_handle
-        .await
-        .map_err(|e| AppError::Internal(e.to_string()))??;
-    result.insert("総合".to_string(), Value::Array(overall_data));
 
     for (i, handle) in handles.into_iter().enumerate() {
         let data = handle
             .await
             .map_err(|e| AppError::Internal(e.to_string()))??;
         result.insert(site.ranking_genres[i].0.to_string(), Value::Array(data));
+    }
+
+    if let Some(handle) = overall_handle {
+        let overall_data = handle
+            .await
+            .map_err(|e| AppError::Internal(e.to_string()))??;
+        result.insert("総合".to_string(), Value::Array(overall_data));
+    } else if site.ranking_genres.len() == 1 {
+        // Single genre: reuse as "総合"
+        let single = result.values().next().cloned().unwrap_or(Value::Array(vec![]));
+        result.insert("総合".to_string(), single);
     }
     Ok(Value::Object(result))
 }
