@@ -34,19 +34,13 @@
 
 	let genreOptions = $derived.by(() => {
 		if (!ranking) return [];
-		const keys = Object.keys(ranking);
-		if (keys.length > 1) {
-			return ['総合', ...keys, '検索'];
-		}
-		return ['総合', '検索'];
+		const keys = Object.keys(ranking).filter((k) => k !== '総合');
+		return ['総合', ...keys, '検索'];
 	});
 
 	let displayNovels = $derived.by(() => {
 		if (isSearchMode) return searchResults ?? [];
 		if (!ranking) return [];
-		if (activeGenre === '総合') {
-			return Object.values(ranking).flat();
-		}
 		return ranking[activeGenre] ?? [];
 	});
 

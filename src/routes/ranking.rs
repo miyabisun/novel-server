@@ -27,14 +27,14 @@ pub fn routes() -> Router<AppState> {
     path = "/api/novel/{type}/ranking",
     tag = "ランキング",
     summary = "ランキング取得",
-    description = "指定サイトのランキングをジャンル別にグループ化して取得する。結果は3時間キャッシュされる。\n\n## 対応サイト\n- **narou**: 小説家になろう（daily/weekly/monthly/quarter/yearly）\n- **nocturne**: ノクターンノベルズ（daily/weekly/monthly/quarter/yearly）\n- **kakuyomu**: カクヨム（daily/weekly/monthly/yearly）※ quarterは非対応",
+    description = "指定サイトのランキングをジャンル別にグループ化して取得する。「総合」キーにジャンル横断の総合ランキングを含む。結果は3時間キャッシュされる。\n\n## 対応サイト\n- **narou**: 小説家になろう（daily/weekly/monthly/quarter/yearly）\n- **nocturne**: ノクターンノベルズ（daily/weekly/monthly/quarter/yearly）\n- **kakuyomu**: カクヨム（daily/weekly/monthly/yearly）※ quarterは非対応",
     params(
         ("type" = String, Path, description = "対象サイト（narou / nocturne / kakuyomu）", example = "narou"),
         ("period" = Option<String>, Query, description = "期間（デフォルト: daily）", example = "daily"),
     ),
     responses(
-        (status = 200, description = "ジャンル名をキーとし各ジャンルに小説の配列が入ったオブジェクト", body = Object,
-            example = json!({"異世界〔恋愛〕": [{"id": "n1234ab", "title": "小説タイトル", "page": 150, "noveltype": 1}]})),
+        (status = 200, description = "「総合」キーとジャンル名をキーとし、各キーに小説の配列が入ったオブジェクト", body = Object,
+            example = json!({"総合": [{"id": "n1234ab", "title": "小説タイトル", "page": 150, "noveltype": 1}], "ハイファンタジー": [{"id": "n5678cd", "title": "別の小説", "page": 50, "noveltype": 1}]})),
         (status = 400, description = "無効なパラメータ", body = crate::openapi::ErrorResponse,
             example = json!({"error": "Invalid period"})),
         (status = 502, description = "外部サイトからの取得に失敗", body = crate::openapi::ErrorResponse),

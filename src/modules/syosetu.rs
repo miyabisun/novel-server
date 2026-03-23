@@ -278,6 +278,24 @@ async fn fetch_ranking(
     .await
 }
 
+async fn fetch_overall_ranking(
+    site: &'static SyosetuSite,
+    client: &reqwest::Client,
+    limit: usize,
+    order: &str,
+) -> Result<Vec<Value>, AppError> {
+    site_api(
+        site,
+        client,
+        &[
+            ("of", OF_RANKING.to_string()),
+            ("lim", limit.to_string()),
+            ("order", order.to_string()),
+        ],
+    )
+    .await
+}
+
 pub async fn fetch_ranking_list(
     site: &'static SyosetuSite,
     client: &reqwest::Client,
@@ -302,7 +320,20 @@ pub async fn fetch_ranking_list(
         }));
     }
 
+    // Fetch overall ranking (no genre filter) in parallel
+    let overall_client = client.clone();
+    let overall_order = order.to_string();
+    let overall_handle = tokio::spawn(async move {
+        fetch_overall_ranking(site, &overall_client, limit, &overall_order).await
+    });
+
     let mut result = serde_json::Map::new();
+
+    let overall_data = overall_handle
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))??;
+    result.insert("総合".to_string(), Value::Array(overall_data));
+
     for (i, handle) in handles.into_iter().enumerate() {
         let data = handle
             .await

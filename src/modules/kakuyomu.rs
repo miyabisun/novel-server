@@ -155,16 +155,22 @@ pub async fn fetch_ranking_list(client: &reqwest::Client, period: &str) -> Resul
             "kakuyomu does not support quarter ranking".to_string(),
         ));
     }
-    let futures: Vec<_> = RANKING_GENRES
+    let mut futures: Vec<_> = RANKING_GENRES
         .iter()
         .map(|(_, slug)| fetch_ranking(client, slug, period))
         .collect();
+    // Fetch overall ranking (genre slug "all") as the last future
+    futures.push(fetch_ranking(client, "all", period));
     let results = futures::future::join_all(futures).await;
 
     let mut map = Map::new();
     for (i, res) in results.into_iter().enumerate() {
         let data = res?;
-        map.insert(RANKING_GENRES[i].0.to_string(), Value::Array(data));
+        if i < RANKING_GENRES.len() {
+            map.insert(RANKING_GENRES[i].0.to_string(), Value::Array(data));
+        } else {
+            map.insert("総合".to_string(), Value::Array(data));
+        }
     }
     Ok(Value::Object(map))
 }
