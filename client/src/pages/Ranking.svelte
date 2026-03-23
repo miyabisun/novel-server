@@ -344,6 +344,10 @@
 	align-items: center
 	margin-bottom: var(--sp-4)
 	gap: var(--sp-3)
+	position: sticky
+	top: var(--header-h)
+	background: var(--c-bg)
+	z-index: 50
 
 .genre-select, .period-select
 	padding: var(--sp-2) var(--sp-3)
@@ -501,10 +505,6 @@
 // Desktop
 @media (min-width: 800px)
 	.toolbar
-		position: sticky
-		top: var(--header-h)
-		background: var(--c-bg)
-		z-index: 50
 		padding-top: var(--sp-4)
 		padding-bottom: var(--sp-4)
 		margin-bottom: 0
