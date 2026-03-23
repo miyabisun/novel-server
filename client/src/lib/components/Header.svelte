@@ -1,15 +1,8 @@
 <script>
 	import { onMount } from 'svelte';
 	import { router, link } from '$lib/router.svelte.js';
-	import { typeColors } from '$lib/constants.js';
+	import { navItems } from '$lib/constants.js';
 	import fetcher from '$lib/fetcher.js';
-
-	const navItems = [
-		{ label: 'favorite', href: '/', color: 'rgba(220, 180, 50, 0.7)' },
-		{ label: 'narou', href: '/ranking/narou', color: typeColors.narou },
-		{ label: 'kakuyomu', href: '/ranking/kakuyomu', color: typeColors.kakuyomu },
-		{ label: 'nocturne', href: '/ranking/nocturne', color: typeColors.nocturne },
-	];
 
 	let email = $state(null);
 
@@ -21,7 +14,7 @@
 	});
 
 	function isActive(item) {
-		if (item.href === '/') return router.index === 0;
+		if (item.path === '/') return router.index === 0;
 		return router.index === 1 && router.params.type === item.label;
 	}
 </script>
@@ -33,7 +26,7 @@
 			<a
 				class="nav-item"
 				class:active={isActive(item)}
-				href={link(item.href)}
+				href={link(item.path)}
 				style:--tab-color={item.color}
 			>{item.label}</a>
 		{/each}

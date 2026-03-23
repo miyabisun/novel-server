@@ -49,78 +49,6 @@
 		}
 	}
 
-
-	// Swipe action for touch devices
-	function swipeable(node, opts) {
-		let startX, startY, offsetX, locked, horizontal;
-		let swipeBg;
-		const { onConfirmDelete } = opts;
-
-		function preventClick(e) {
-			e.stopPropagation();
-			e.preventDefault();
-		}
-
-		function onStart(e) {
-			const touch = e.touches[0];
-			startX = touch.clientX;
-			startY = touch.clientY;
-			offsetX = 0;
-			locked = false;
-			horizontal = false;
-			swipeBg = node.previousElementSibling;
-			node.style.transition = 'none';
-			if (swipeBg) swipeBg.style.transition = 'none';
-		}
-
-		function onMove(e) {
-			const touch = e.touches[0];
-			const dx = touch.clientX - startX;
-			const dy = touch.clientY - startY;
-
-			if (!locked) {
-				if (Math.abs(dx) < 5 && Math.abs(dy) < 5) return;
-				locked = true;
-				horizontal = Math.abs(dx) > Math.abs(dy);
-			}
-			if (!horizontal) return;
-
-			e.preventDefault();
-			offsetX = Math.max(-80, Math.min(0, dx));
-			node.style.transform = `translateX(${offsetX}px)`;
-			if (swipeBg) swipeBg.style.opacity = Math.min(1, Math.abs(offsetX) / 40);
-		}
-
-		function onEnd() {
-			if (!locked) return;
-			if (horizontal) {
-				node.addEventListener('click', preventClick, { once: true, capture: true });
-				if (offsetX < -40) onConfirmDelete();
-			}
-			node.style.transition = 'transform 0.2s ease';
-			node.style.transform = 'translateX(0)';
-			if (swipeBg) {
-				swipeBg.style.transition = 'opacity 0.2s ease';
-				swipeBg.style.opacity = 0;
-			}
-			offsetX = 0;
-		}
-
-		node.addEventListener('touchstart', onStart, { passive: true });
-		node.addEventListener('touchmove', onMove, { passive: false });
-		node.addEventListener('touchend', onEnd, { passive: true });
-		node.addEventListener('touchcancel', onEnd, { passive: true });
-
-		return {
-			destroy() {
-				node.removeEventListener('touchstart', onStart);
-				node.removeEventListener('touchmove', onMove);
-				node.removeEventListener('touchend', onEnd);
-				node.removeEventListener('touchcancel', onEnd);
-			},
-		};
-	}
-
 	function formatDate(dateStr) {
 		if (!dateStr) return null;
 		return dateStr.replace(/:\d{2}$/, '');
@@ -140,11 +68,7 @@
 		<div class="fav-grid">
 			{#each favorites as fav (fav.type + ':' + fav.id)}
 				<div class="fav-wrapper">
-					<div class="swipe-bg">削除</div>
-					<div
-						class="fav-card"
-						use:swipeable={{ onConfirmDelete: () => confirmDelete(fav) }}
-					>
+					<div class="fav-card">
 						<div class="card-body">
 							<div class="card-header">
 								<span class="card-info">{fav.read} / {fav.page}{#if fav.novelupdated_at} <span class="card-updated">{formatDate(fav.novelupdated_at)}</span>{/if}</span>
@@ -240,9 +164,6 @@
 	flex-shrink: 0
 	border-left: 1px solid var(--c-border)
 
-.swipe-bg
-	display: none
-
 .delete-btn
 	padding: 0 var(--sp-4)
 	border: none
@@ -255,32 +176,4 @@
 	&:hover
 		background: var(--c-danger-hover)
 
-// Mobile: swipe-to-delete
-@media (max-width: 799px)
-	.fav-wrapper
-		position: relative
-		overflow: hidden
-
-	.fav-card
-		background: var(--c-bg)
-		position: relative
-		z-index: 1
-
-	.card-actions
-		display: none
-
-	.swipe-bg
-		display: flex
-		align-items: center
-		justify-content: flex-end
-		padding-right: var(--sp-5)
-		position: absolute
-		right: 0
-		top: 0
-		bottom: 0
-		width: 80px
-		color: var(--c-danger)
-		font-weight: bold
-		font-size: var(--fs-sm)
-		opacity: 0
 </style>

@@ -69,13 +69,24 @@
 		}
 	}
 
+	function updateUrlParams() {
+		const params = new URLSearchParams();
+		if (activePeriod !== 'daily') params.set('period', activePeriod);
+		if (activeGenre !== '総合') params.set('genre', activeGenre);
+		const qs = params.toString();
+		const url = window.location.pathname + (qs ? '?' + qs : '');
+		history.replaceState({}, '', url);
+	}
+
 	function selectPeriod(period) {
 		activePeriod = period;
+		updateUrlParams();
 		loadRanking(type, period);
 	}
 
 	function selectGenre(value) {
 		activeGenre = value;
+		updateUrlParams();
 		if (value === '検索') {
 			searchResults = null;
 		}
@@ -146,104 +157,23 @@
 		}
 	}
 
-
-	// Bidirectional swipe action for touch devices
-	function swipeable(node, opts) {
-		let startX, startY, offsetX, locked, horizontal;
-		let { isFav, novel } = opts;
-		let bgAdd, bgDelete;
-
-		function preventClick(e) {
-			e.stopPropagation();
-			e.preventDefault();
-		}
-
-		function onStart(e) {
-			const touch = e.touches[0];
-			startX = touch.clientX;
-			startY = touch.clientY;
-			offsetX = 0;
-			locked = false;
-			horizontal = false;
-			bgAdd = node.parentElement.querySelector('.swipe-bg-add');
-			bgDelete = node.parentElement.querySelector('.swipe-bg-delete');
-			node.style.transition = 'none';
-			if (bgAdd) bgAdd.style.transition = 'none';
-			if (bgDelete) bgDelete.style.transition = 'none';
-		}
-
-		function onMove(e) {
-			const touch = e.touches[0];
-			const dx = touch.clientX - startX;
-			const dy = touch.clientY - startY;
-
-			if (!locked) {
-				if (Math.abs(dx) < 5 && Math.abs(dy) < 5) return;
-				locked = true;
-				horizontal = Math.abs(dx) > Math.abs(dy);
-			}
-			if (!horizontal) return;
-
-			e.preventDefault();
-			// Left swipe (delete): only if fav; Right swipe (add): only if not fav
-			if (dx < 0 && isFav) {
-				offsetX = Math.max(-80, dx);
-			} else if (dx > 0 && !isFav) {
-				offsetX = Math.min(80, dx);
-			} else {
-				offsetX = 0;
-			}
-			node.style.transform = `translateX(${offsetX}px)`;
-			if (bgDelete) bgDelete.style.opacity = Math.min(1, Math.max(0, -offsetX) / 40);
-			if (bgAdd) bgAdd.style.opacity = Math.min(1, Math.max(0, offsetX) / 40);
-		}
-
-		function onEnd() {
-			if (!locked) return;
-			if (horizontal) {
-				node.addEventListener('click', preventClick, { once: true, capture: true });
-				if (offsetX < -40 && isFav) confirmDelete(novel);
-				if (offsetX > 40 && !isFav) addFavorite(novel);
-			}
-			node.style.transition = 'transform 0.2s ease';
-			node.style.transform = 'translateX(0)';
-			if (bgDelete) {
-				bgDelete.style.transition = 'opacity 0.2s ease';
-				bgDelete.style.opacity = 0;
-			}
-			if (bgAdd) {
-				bgAdd.style.transition = 'opacity 0.2s ease';
-				bgAdd.style.opacity = 0;
-			}
-			offsetX = 0;
-		}
-
-		node.addEventListener('touchstart', onStart, { passive: true });
-		node.addEventListener('touchmove', onMove, { passive: false });
-		node.addEventListener('touchend', onEnd, { passive: true });
-		node.addEventListener('touchcancel', onEnd, { passive: true });
-
+	function readUrlParams() {
+		const params = new URLSearchParams(window.location.search);
 		return {
-			update(newOpts) {
-				isFav = newOpts.isFav;
-				novel = newOpts.novel;
-			},
-			destroy() {
-				node.removeEventListener('touchstart', onStart);
-				node.removeEventListener('touchmove', onMove);
-				node.removeEventListener('touchend', onEnd);
-				node.removeEventListener('touchcancel', onEnd);
-			},
+			genre: params.get('genre') || '総合',
+			period: params.get('period') || 'daily',
 		};
 	}
 
 	$effect(() => {
-		activePeriod = 'daily';
-		activeGenre = '総合';
+		const saved = readUrlParams();
+		activePeriod = saved.period;
+		activeGenre = saved.genre;
 		searchQuery = '';
 		searchResults = null;
-		loadRanking(type, 'daily');
+		loadRanking(type, saved.period);
 	});
+
 </script>
 
 <div class="ranking">
@@ -283,12 +213,9 @@
 		<div class="novel-grid">
 			{#each displayNovels as novel, i}
 				<div class="novel-card-wrapper">
-					<div class="swipe-bg-add">追加</div>
-					<div class="swipe-bg-delete">削除</div>
 					<div
 						class="novel-card"
 						class:is-fav={favIds.has(novel.id)}
-						use:swipeable={{ isFav: favIds.has(novel.id), novel }}
 					>
 						<div class="card-body">
 							<div class="card-header">
@@ -344,6 +271,10 @@
 	align-items: center
 	margin-bottom: var(--sp-4)
 	gap: var(--sp-3)
+	position: sticky
+	top: var(--header-h)
+	background: var(--c-bg)
+	z-index: 50
 
 .genre-select, .period-select
 	padding: var(--sp-2) var(--sp-3)
@@ -417,9 +348,6 @@
 
 	&.is-fav
 		border-left: 3px solid var(--c-fav-border)
-
-.swipe-bg-add, .swipe-bg-delete
-	display: none
 
 .card-body
 	flex: 1
@@ -501,10 +429,6 @@
 // Desktop
 @media (min-width: 800px)
 	.toolbar
-		position: sticky
-		top: var(--header-h)
-		background: var(--c-bg)
-		z-index: 50
 		padding-top: var(--sp-4)
 		padding-bottom: var(--sp-4)
 		margin-bottom: 0
@@ -515,44 +439,9 @@
 	.card-title
 		font-size: var(--fs-md)
 
-// Mobile: swipe actions
+// Mobile
 @media (max-width: 799px)
-	.novel-card-wrapper
-		position: relative
-		overflow: hidden
-
-	.novel-card
-		background: var(--c-bg)
-		position: relative
-		z-index: 1
-
-	.fav-btn, .unfav-btn
-		display: none
-
 	.detail-btn
 		border-bottom: none
 		border-radius: 0 var(--radius-md) var(--radius-md) 0
-
-	.swipe-bg-add, .swipe-bg-delete
-		display: flex
-		align-items: center
-		position: absolute
-		top: 0
-		bottom: 0
-		width: 80px
-		font-weight: bold
-		font-size: var(--fs-sm)
-		opacity: 0
-
-	.swipe-bg-add
-		left: 0
-		justify-content: flex-start
-		padding-left: var(--sp-5)
-		color: var(--c-fav)
-
-	.swipe-bg-delete
-		right: 0
-		justify-content: flex-end
-		padding-right: var(--sp-5)
-		color: var(--c-danger)
 </style>
