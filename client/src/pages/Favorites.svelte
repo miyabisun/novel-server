@@ -176,4 +176,7 @@
 	&:hover
 		background: var(--c-danger-hover)
 
+@media (max-width: 799px)
+	.card-actions
+		display: none
 </style>

@@ -75,7 +75,7 @@
 		if (activeGenre !== '総合') params.set('genre', activeGenre);
 		const qs = params.toString();
 		const url = window.location.pathname + (qs ? '?' + qs : '');
-		history.replaceState({}, '', url);
+		history.pushState({}, '', url);
 	}
 
 	function selectPeriod(period) {
@@ -174,6 +174,18 @@
 		loadRanking(type, saved.period);
 	});
 
+	$effect(() => {
+		function onPopState() {
+			const saved = readUrlParams();
+			if (saved.genre !== activeGenre) activeGenre = saved.genre;
+			if (saved.period !== activePeriod) {
+				activePeriod = saved.period;
+				loadRanking(type, saved.period);
+			}
+		}
+		window.addEventListener('popstate', onPopState);
+		return () => window.removeEventListener('popstate', onPopState);
+	});
 </script>
 
 <div class="ranking">
@@ -441,6 +453,9 @@
 
 // Mobile
 @media (max-width: 799px)
+	.fav-btn, .unfav-btn
+		display: none
+
 	.detail-btn
 		border-bottom: none
 		border-radius: 0 var(--radius-md) var(--radius-md) 0
