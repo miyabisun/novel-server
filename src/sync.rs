@@ -1,5 +1,6 @@
 use crate::modules::ModuleType;
 use crate::state::AppState;
+use chrono::Utc;
 use rusqlite::Connection;
 use serde_json::Value;
 use std::sync::{Arc, Mutex};
@@ -41,26 +42,25 @@ fn get_ids(db: &Arc<Mutex<Connection>>, type_str: &str) -> Vec<String> {
 }
 
 /// Update a single favorite record with fetched datum.
-/// `datum` must contain at least: `id` (string), `title` (string),
-/// `pages` (array, length used as page count), `novelupdated_at` (string, optional).
+/// Only updates `novelupdated_at` when `page` has increased (new chapters detected).
 pub fn update_favorite_from_datum(db: &Arc<Mutex<Connection>>, type_str: &str, datum: &Value) {
     let id = datum["id"].as_str().unwrap_or_default();
     let title = datum["title"].as_str();
-    let page = datum["pages"].as_array().map(|a| a.len() as i64);
-    let novelupdated_at = datum["novelupdated_at"].as_str();
+    let new_page = datum["pages"].as_array().map(|a| a.len() as i64);
 
-    if title.is_none() && page.is_none() && novelupdated_at.is_none() {
+    if title.is_none() && new_page.is_none() {
         return;
     }
 
     let conn = db.lock().unwrap();
+    let now = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let _ = conn.execute(
         "UPDATE favorites SET
             title = COALESCE(?1, title),
             page = COALESCE(?2, page),
-            novelupdated_at = COALESCE(?3, novelupdated_at)
+            novelupdated_at = CASE WHEN ?2 > page THEN ?3 ELSE novelupdated_at END
          WHERE type = ?4 AND id = ?5",
-        rusqlite::params![title, page, novelupdated_at, type_str, id],
+        rusqlite::params![title, new_page, now, type_str, id],
     );
 }
 
@@ -96,23 +96,20 @@ async fn sync_syosetu(state: &AppState, module: &ModuleType, type_str: &str) {
                         return;
                     }
                 };
-                // Use direct SQL within transaction scope
+                let now = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
                 for datum in &data {
                     let id = datum["id"].as_str().unwrap_or_default();
                     let title = datum["title"].as_str();
-                    let page = datum["pages"].as_array().map(|a| a.len() as i64);
-                    let novelupdated_at = datum["novelupdated_at"].as_str();
+                    let new_page = datum["pages"].as_array().map(|a| a.len() as i64);
 
-                    // Simple approach: always update all three fields
-                    if title.is_some() || page.is_some() || novelupdated_at.is_some() {
-                        // Use a single UPDATE with COALESCE-like approach
+                    if title.is_some() || new_page.is_some() {
                         let _ = tx.execute(
                             "UPDATE favorites SET
                                 title = COALESCE(?1, title),
                                 page = COALESCE(?2, page),
-                                novelupdated_at = COALESCE(?3, novelupdated_at)
+                                novelupdated_at = CASE WHEN ?2 > page THEN ?3 ELSE novelupdated_at END
                              WHERE type = ?4 AND id = ?5",
-                            rusqlite::params![title, page, novelupdated_at, type_str, id],
+                            rusqlite::params![title, new_page, now, type_str, id],
                         );
                     }
                 }

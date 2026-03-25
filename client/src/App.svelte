@@ -30,6 +30,7 @@
 	});
 
 	const tabPaths = navItems.map((item) => item.path);
+	const tabLabels = navItems.map((item) => item.label);
 
 	function getTabIndex() {
 		if (router.index === 0) return 0;
@@ -40,6 +41,10 @@
 		return -1;
 	}
 
+	let swipeDir = $state(null);
+	let swipeReady = $state(false);
+	let swipeLabel = $state('');
+
 	function swipeNav(node) {
 		let startX, startY, locked, horizontal;
 
@@ -48,6 +53,8 @@
 			startY = e.touches[0].clientY;
 			locked = false;
 			horizontal = false;
+			swipeDir = null;
+			swipeReady = false;
 		}
 
 		function onMove(e) {
@@ -58,19 +65,35 @@
 				locked = true;
 				horizontal = Math.abs(dx) > Math.abs(dy);
 			}
-			if (horizontal) e.preventDefault();
+			if (!horizontal) return;
+			e.preventDefault();
+			const tabIdx = getTabIndex();
+			if (tabIdx < 0) return;
+			const dir = dx < 0 ? 'next' : 'prev';
+			const targetIdx = dir === 'next' ? tabIdx + 1 : tabIdx - 1;
+			if (targetIdx < 0 || targetIdx >= tabPaths.length) {
+				swipeDir = null;
+				return;
+			}
+			swipeDir = dir;
+			swipeLabel = tabLabels[targetIdx];
+			swipeReady = Math.abs(dx) >= 40;
 		}
 
 		function onEnd(e) {
-			if (!locked || !horizontal) return;
-			const dx = e.changedTouches[0].clientX - startX;
-			const tabIdx = getTabIndex();
-			if (tabIdx < 0) return;
-			if (dx < -40 && tabIdx < tabPaths.length - 1) {
-				navigate(tabPaths[tabIdx + 1]);
-			} else if (dx > 40 && tabIdx > 0) {
-				navigate(tabPaths[tabIdx - 1]);
+			if (locked && horizontal) {
+				const dx = e.changedTouches[0].clientX - startX;
+				const tabIdx = getTabIndex();
+				if (tabIdx >= 0) {
+					if (dx < -40 && tabIdx < tabPaths.length - 1) {
+						navigate(tabPaths[tabIdx + 1]);
+					} else if (dx > 40 && tabIdx > 0) {
+						navigate(tabPaths[tabIdx - 1]);
+					}
+				}
 			}
+			swipeDir = null;
+			swipeReady = false;
 		}
 
 		node.addEventListener('touchstart', onStart, { passive: true });
@@ -90,6 +113,12 @@
 <div class="app">
 	<Header />
 	<main use:swipeNav>
+		{#if swipeDir === 'prev'}
+			<div class="swipe-hint left" class:ready={swipeReady}>‹ {swipeLabel}</div>
+		{/if}
+		{#if swipeDir === 'next'}
+			<div class="swipe-hint right" class:ready={swipeReady}>{swipeLabel} ›</div>
+		{/if}
 		{#if router.index === 0}
 			<Favorites />
 		{:else if router.index === 1}

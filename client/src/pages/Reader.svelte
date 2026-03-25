@@ -362,30 +362,4 @@
 	:global(br)
 		line-height: 2
 
-.swipe-hint
-	position: fixed
-	top: 50%
-	transform: translateY(-50%)
-	padding: var(--sp-4)
-	background: rgba(0, 0, 0, 0.7)
-	color: var(--c-text-sub)
-	font-size: var(--fs-sm)
-	border-radius: var(--radius-lg)
-	z-index: 100
-	pointer-events: none
-	transition: background 0.15s, color 0.15s
-
-	&.left
-		left: var(--sp-4)
-
-	&.right
-		right: var(--sp-4)
-
-	&.ready
-		background: rgba(0, 0, 0, 0.85)
-		color: rgba(255, 255, 255, 0.95)
-
-	&.disabled
-		color: rgba(255, 255, 255, 0.55)
-
 </style>
