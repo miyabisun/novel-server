@@ -59,7 +59,8 @@ pub fn update_favorite_from_datum(db: &Arc<Mutex<Connection>>, type_str: &str, d
             title = COALESCE(?1, title),
             page = COALESCE(?2, page),
             novelupdated_at = CASE WHEN ?2 > page THEN ?3 ELSE novelupdated_at END
-         WHERE type = ?4 AND id = ?5",
+         WHERE type = ?4 AND id = ?5
+            AND (?2 IS NOT NULL AND ?2 != page OR ?1 IS NOT NULL AND ?1 != title)",
         rusqlite::params![title, new_page, now, type_str, id],
     );
 }
@@ -87,6 +88,7 @@ async fn sync_syosetu(state: &AppState, module: &ModuleType, type_str: &str) {
 
     match module.fetch_data(&state.http, &ids).await {
         Ok(data) => {
+            let mut changed = 0usize;
             {
                 let conn = state.db.lock().unwrap();
                 let tx = match conn.unchecked_transaction() {
@@ -103,19 +105,19 @@ async fn sync_syosetu(state: &AppState, module: &ModuleType, type_str: &str) {
                     let new_page = datum["pages"].as_array().map(|a| a.len() as i64);
 
                     if title.is_some() || new_page.is_some() {
-                        let _ = tx.execute(
+                        changed += tx.execute(
                             "UPDATE favorites SET
                                 title = COALESCE(?1, title),
                                 page = COALESCE(?2, page),
                                 novelupdated_at = CASE WHEN ?2 > page THEN ?3 ELSE novelupdated_at END
-                             WHERE type = ?4 AND id = ?5",
+                             WHERE type = ?4 AND id = ?5 AND (?2 IS NOT NULL AND ?2 != page OR ?1 IS NOT NULL AND ?1 != title)",
                             rusqlite::params![title, new_page, now, type_str, id],
-                        );
+                        ).unwrap_or(0);
                     }
                 }
                 let _ = tx.commit();
             }
-            tracing::info!("[sync] {}: updated {} items", type_str, data.len());
+            tracing::info!("[sync] {}: checked {} items, {} changed", type_str, data.len(), changed);
         }
         Err(e) => {
             tracing::error!("[sync] {} error: {}", type_str, e);

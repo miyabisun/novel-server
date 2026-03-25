@@ -376,14 +376,22 @@ pub async fn fetch_data(
     client: &reqwest::Client,
     ids: &[String],
 ) -> Result<Vec<Value>, AppError> {
-    let ncode_str = ids.join("-");
-    let data = site_api(
-        site,
-        client,
-        &[("of", OF_DATUM.to_string()), ("ncode", ncode_str)],
-    )
-    .await?;
-    Ok(data.iter().map(|d| to_datum(site, d)).collect())
+    let mut all = Vec::new();
+    for chunk in ids.chunks(500) {
+        let ncode_str = chunk.join("-");
+        let data = site_api(
+            site,
+            client,
+            &[
+                ("of", OF_DATUM.to_string()),
+                ("ncode", ncode_str),
+                ("lim", chunk.len().to_string()),
+            ],
+        )
+        .await?;
+        all.extend(data.iter().map(|d| to_datum(site, d)));
+    }
+    Ok(all)
 }
 
 pub async fn fetch_detail(
