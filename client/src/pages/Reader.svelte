@@ -19,13 +19,18 @@
 	let currentNum = $derived(Number(params.num));
 	let canGoPrev = $derived(currentNum > 1);
 	let canGoNext = $derived(!totalPages || currentNum < totalPages);
+	// Holds the in-flight loadMeta() so loadPage() can wait for isFav before patching progress.
+	// The metaPromise effect must stay declared before the loadPage effect (Svelte $effects run in source order).
+	let metaPromise = null;
 
 	async function loadPage(type, id, num) {
+		const meta = metaPromise;
 		loading = true;
 		error = null;
 		try {
 			const data = await fetcher(`${config.path.api}/novel/${type}/${id}/pages/${num}`);
 			html = data.html || '';
+			await meta;
 			updateProgress(type, id, num);
 		} catch (e) {
 			error = e.message;
@@ -132,7 +137,7 @@
 	});
 
 	$effect(() => {
-		loadMeta(params.type, params.id);
+		metaPromise = loadMeta(params.type, params.id);
 	});
 
 	$effect(() => {
