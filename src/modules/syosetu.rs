@@ -213,8 +213,12 @@ pub static NOCTURNE: SyosetuSite = SyosetuSite {
 
 /// Output fields for ranking/search (title, writer, ncode, general_all_no, noveltype)
 const OF_RANKING: &str = "t-w-n-ga-nt";
-/// Output fields for datum/data (ncode, title, general_all_no, story, novelupdated_at)
-const OF_DATUM: &str = "n-t-ga-s-nu";
+/// Output fields for datum/data (ncode, title, general_all_no, story, general_lastup).
+/// `general_lastup` (last episode published) is the favorites sort key; it is
+/// exposed as `novelupdated_at` in the datum (see `to_datum`). The API's own
+/// `novelupdated_at` is deliberately *not* requested: it also moves on author
+/// edits to existing text (typo fixes), which we do not want to surface.
+const OF_DATUM: &str = "n-t-ga-s-gl";
 /// Output fields for detail (title, story, general_all_no)
 const OF_DETAIL: &str = "t-s-ga";
 
@@ -234,6 +238,12 @@ fn to_datum(site: &SyosetuSite, datum: &Value) -> Value {
     let pages = build_pages(site.type_str, id, page_count);
     let mut obj = datum.as_object().cloned().unwrap_or_default();
     obj.remove("page");
+    // Expose general_lastup (last episode published) as `novelupdated_at` so the
+    // shared sync logic sees one uniform "last chapter" key across every site
+    // (kakuyomu emits the same field from lastEpisodePublishedAt).
+    if let Some(general_lastup) = obj.remove("general_lastup") {
+        obj.insert("novelupdated_at".to_string(), general_lastup);
+    }
     obj.insert("type".to_string(), json!(site.type_str));
     obj.insert("pages".to_string(), pages);
     Value::Object(obj)
@@ -586,7 +596,7 @@ mod tests {
     fn process_api_response_normal_response() {
         let raw = vec![
             json!({"allcount": 2}),
-            json!({"ncode": "N1111AA", "title": "  Novel One  ", "general_all_no": 42, "novelupdated_at": "2026-01-01"}),
+            json!({"ncode": "N1111AA", "title": "  Novel One  ", "general_all_no": 42, "general_lastup": "2026-01-01"}),
             json!({"ncode": "N2222BB", "title": "Novel Two", "general_all_no": 7}),
         ];
         let result = process_api_response(raw);
@@ -594,9 +604,38 @@ mod tests {
         assert_eq!(result[0]["id"], "n1111aa");
         assert_eq!(result[0]["title"], "Novel One");
         assert_eq!(result[0]["page"], 42);
-        assert_eq!(result[0]["novelupdated_at"], "2026-01-01");
+        // map_item passes general_lastup through untouched; to_datum renames it.
+        assert_eq!(result[0]["general_lastup"], "2026-01-01");
         assert_eq!(result[1]["id"], "n2222bb");
         assert_eq!(result[1]["page"], 7);
+    }
+
+    // ── to_datum: general_lastup is exposed as novelupdated_at ──
+
+    #[test]
+    fn to_datum_exposes_general_lastup_as_novelupdated_at() {
+        let item = json!({
+            "id": "n1234ab",
+            "title": "Novel",
+            "page": 3,
+            "general_lastup": "2026-05-17 18:00:00",
+        });
+        let datum = to_datum(&NAROU, &item);
+        // general_lastup becomes the sort key under the uniform name...
+        assert_eq!(datum["novelupdated_at"], "2026-05-17 18:00:00");
+        // ...and the original key is consumed (not left dangling).
+        assert!(datum.get("general_lastup").is_none());
+        assert_eq!(datum["type"], "narou");
+        assert_eq!(datum["pages"].as_array().unwrap().len(), 3);
+        assert!(datum.get("page").is_none());
+    }
+
+    #[test]
+    fn to_datum_without_general_lastup_has_no_novelupdated_at() {
+        let item = json!({"id": "n1234ab", "title": "Novel", "page": 2});
+        let datum = to_datum(&NAROU, &item);
+        assert!(datum.get("novelupdated_at").is_none());
+        assert_eq!(datum["pages"].as_array().unwrap().len(), 2);
     }
 
     // ── OF constants must use hyphens, not commas (regression for syosetu API bug) ──

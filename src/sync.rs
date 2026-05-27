@@ -1,10 +1,33 @@
 use crate::modules::ModuleType;
 use crate::state::AppState;
-use chrono::Utc;
 use rusqlite::Connection;
 use serde_json::Value;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+
+/// Refresh a favorite's metadata from a fetched datum. Shared by the periodic
+/// sync and the fire-and-forget fetch on registration so the two never diverge.
+///
+/// `novelupdated_at` is set from the source API's "last episode published" time
+/// (narou/nocturne `general_lastup`, kakuyomu `lastEpisodePublishedAt`, both
+/// normalized to the `novelupdated_at` key). It therefore advances only when a
+/// new chapter is posted — not on author edits to existing text — yet always
+/// reflects the real publication time rather than a crawl-time approximation, so
+/// even long-stale novels get a correct, non-NULL sort key.
+///
+/// The WHERE clause writes only when an API value actually differs from the
+/// stored one (null-safe `IS NOT`), so re-running against unchanged novels is a
+/// no-op and the periodic sync's "changed" count stays meaningful.
+///
+/// Params: ?1 = title, ?2 = page, ?3 = novelupdated_at, ?4 = type, ?5 = id.
+const REFRESH_FAVORITE_SQL: &str = "UPDATE favorites SET
+        title = COALESCE(?1, title),
+        page = COALESCE(?2, page),
+        novelupdated_at = COALESCE(?3, novelupdated_at)
+     WHERE type = ?4 AND id = ?5
+       AND ((?1 IS NOT NULL AND ?1 IS NOT title)
+            OR (?2 IS NOT NULL AND ?2 IS NOT page)
+            OR (?3 IS NOT NULL AND ?3 IS NOT novelupdated_at))";
 
 /// Periodically sync favorite metadata in the background.
 ///
@@ -41,27 +64,22 @@ fn get_ids(db: &Arc<Mutex<Connection>>, type_str: &str) -> Vec<String> {
     result
 }
 
-/// Update a single favorite record with fetched datum.
-/// Only updates `novelupdated_at` when `page` has increased (new chapters detected).
+/// Refresh a single favorite from a fetched datum (kakuyomu periodic sync and the
+/// initial fetch on registration). See [`REFRESH_FAVORITE_SQL`] for the semantics.
 pub fn update_favorite_from_datum(db: &Arc<Mutex<Connection>>, type_str: &str, datum: &Value) {
     let id = datum["id"].as_str().unwrap_or_default();
     let title = datum["title"].as_str();
     let new_page = datum["pages"].as_array().map(|a| a.len() as i64);
+    let novelupdated_at = datum["novelupdated_at"].as_str();
 
-    if title.is_none() && new_page.is_none() {
+    if title.is_none() && new_page.is_none() && novelupdated_at.is_none() {
         return;
     }
 
     let conn = db.lock().unwrap();
-    let now = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let _ = conn.execute(
-        "UPDATE favorites SET
-            title = COALESCE(?1, title),
-            page = COALESCE(?2, page),
-            novelupdated_at = CASE WHEN ?2 > page THEN ?3 ELSE novelupdated_at END
-         WHERE type = ?4 AND id = ?5
-            AND (?2 IS NOT NULL AND ?2 != page OR ?1 IS NOT NULL AND ?1 != title)",
-        rusqlite::params![title, new_page, now, type_str, id],
+        REFRESH_FAVORITE_SQL,
+        rusqlite::params![title, new_page, novelupdated_at, type_str, id],
     );
 }
 
@@ -98,21 +116,19 @@ async fn sync_syosetu(state: &AppState, module: &ModuleType, type_str: &str) {
                         return;
                     }
                 };
-                let now = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
                 for datum in &data {
                     let id = datum["id"].as_str().unwrap_or_default();
                     let title = datum["title"].as_str();
                     let new_page = datum["pages"].as_array().map(|a| a.len() as i64);
+                    let novelupdated_at = datum["novelupdated_at"].as_str();
 
-                    if title.is_some() || new_page.is_some() {
-                        changed += tx.execute(
-                            "UPDATE favorites SET
-                                title = COALESCE(?1, title),
-                                page = COALESCE(?2, page),
-                                novelupdated_at = CASE WHEN ?2 > page THEN ?3 ELSE novelupdated_at END
-                             WHERE type = ?4 AND id = ?5 AND (?2 IS NOT NULL AND ?2 != page OR ?1 IS NOT NULL AND ?1 != title)",
-                            rusqlite::params![title, new_page, now, type_str, id],
-                        ).unwrap_or(0);
+                    if title.is_some() || new_page.is_some() || novelupdated_at.is_some() {
+                        changed += tx
+                            .execute(
+                                REFRESH_FAVORITE_SQL,
+                                rusqlite::params![title, new_page, novelupdated_at, type_str, id],
+                            )
+                            .unwrap_or(0);
                     }
                 }
                 let _ = tx.commit();
@@ -157,4 +173,103 @@ fn start_kakuyomu_sync(state: AppState) {
             }
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn db_with_favorite(
+        novelupdated_at: Option<&str>,
+        page: i64,
+        title: &str,
+    ) -> Arc<Mutex<Connection>> {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE favorites (
+                user_id INTEGER NOT NULL DEFAULT 1,
+                type TEXT NOT NULL,
+                id TEXT NOT NULL,
+                title TEXT NOT NULL,
+                novelupdated_at TEXT,
+                page INTEGER NOT NULL,
+                read INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (user_id, type, id)
+            );",
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO favorites (user_id, type, id, title, novelupdated_at, page)
+             VALUES (1, 'narou', 'n1234ab', ?1, ?2, ?3)",
+            rusqlite::params![title, novelupdated_at, page],
+        )
+        .unwrap();
+        Arc::new(Mutex::new(conn))
+    }
+
+    fn pages(n: usize) -> Value {
+        Value::Array((0..n).map(|_| json!({})).collect())
+    }
+
+    fn stored(db: &Arc<Mutex<Connection>>) -> (String, Option<String>) {
+        db.lock()
+            .unwrap()
+            .query_row(
+                "SELECT title, novelupdated_at FROM favorites WHERE type = 'narou' AND id = 'n1234ab'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap()
+    }
+
+    /// A fetched datum with general_lastup already normalized to `novelupdated_at`.
+    fn datum(title: &str, page_count: usize, novelupdated_at: Option<&str>) -> Value {
+        let mut d = json!({ "id": "n1234ab", "title": title, "pages": pages(page_count) });
+        if let Some(t) = novelupdated_at {
+            d["novelupdated_at"] = json!(t);
+        }
+        d
+    }
+
+    #[test]
+    fn seeds_novelupdated_at_on_registration_when_title_and_page_unchanged() {
+        // Stale-novel registration: the client already stored the correct
+        // title/page, leaving novelupdated_at NULL. The fetch must still seed it
+        // from general_lastup even though title/page did not change. (Regression:
+        // the old change-detection guard skipped unchanged rows, so the timestamp
+        // stayed NULL and the favorite sank to the bottom of the list.)
+        let db = db_with_favorite(None, 3, "Stale Novel");
+        update_favorite_from_datum(&db, "narou", &datum("Stale Novel", 3, Some("2024-03-15 10:00:00")));
+        assert_eq!(stored(&db).1.as_deref(), Some("2024-03-15 10:00:00"));
+    }
+
+    #[test]
+    fn overwrites_existing_value_with_api_general_lastup() {
+        // A row previously stamped with a (now-removed) crawl time is corrected to
+        // the real publication time on the next sync.
+        let db = db_with_favorite(Some("2026-05-20 10:00:00"), 3, "Novel");
+        update_favorite_from_datum(&db, "narou", &datum("Novel", 3, Some("2026-05-20 09:55:00")));
+        assert_eq!(stored(&db).1.as_deref(), Some("2026-05-20 09:55:00"));
+    }
+
+    #[test]
+    fn keeps_existing_when_datum_has_no_novelupdated_at() {
+        // kakuyomu omits the timestamp when lastEpisodePublishedAt is missing;
+        // COALESCE must not clobber an existing value with NULL.
+        let db = db_with_favorite(Some("2024-01-01 00:00:00"), 3, "Novel");
+        update_favorite_from_datum(&db, "narou", &datum("Novel", 3, None));
+        assert_eq!(stored(&db).1.as_deref(), Some("2024-01-01 00:00:00"));
+    }
+
+    #[test]
+    fn refreshes_title_while_preserving_timestamp() {
+        // A title change triggers the UPDATE, but a datum without novelupdated_at
+        // must leave the stored timestamp untouched (independent COALESCE columns).
+        let db = db_with_favorite(Some("2024-01-01 00:00:00"), 3, "Old Title");
+        update_favorite_from_datum(&db, "narou", &datum("New Title", 3, None));
+        let (title, ts) = stored(&db);
+        assert_eq!(title, "New Title");
+        assert_eq!(ts.as_deref(), Some("2024-01-01 00:00:00"));
+    }
 }
