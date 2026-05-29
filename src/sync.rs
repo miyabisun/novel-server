@@ -64,23 +64,31 @@ fn get_ids(db: &Arc<Mutex<Connection>>, type_str: &str) -> Vec<String> {
     result
 }
 
-/// Refresh a single favorite from a fetched datum (kakuyomu periodic sync and the
-/// initial fetch on registration). See [`REFRESH_FAVORITE_SQL`] for the semantics.
-pub fn update_favorite_from_datum(db: &Arc<Mutex<Connection>>, type_str: &str, datum: &Value) {
+/// Apply one fetched datum to its favorite row, returning the number of rows
+/// actually changed (0 when nothing differed). Shared by the batched periodic
+/// sync (called with a `Transaction`, which derefs to `Connection`) and the
+/// single-row path below. See [`REFRESH_FAVORITE_SQL`] for the semantics.
+fn refresh_favorite(conn: &Connection, type_str: &str, datum: &Value) -> usize {
     let id = datum["id"].as_str().unwrap_or_default();
     let title = datum["title"].as_str();
     let new_page = datum["pages"].as_array().map(|a| a.len() as i64);
     let novelupdated_at = datum["novelupdated_at"].as_str();
 
     if title.is_none() && new_page.is_none() && novelupdated_at.is_none() {
-        return;
+        return 0;
     }
-
-    let conn = db.lock().unwrap();
-    let _ = conn.execute(
+    conn.execute(
         REFRESH_FAVORITE_SQL,
         rusqlite::params![title, new_page, novelupdated_at, type_str, id],
-    );
+    )
+    .unwrap_or(0)
+}
+
+/// Refresh a single favorite from a fetched datum (kakuyomu periodic sync and the
+/// initial fetch on registration). See [`REFRESH_FAVORITE_SQL`] for the semantics.
+pub fn update_favorite_from_datum(db: &Arc<Mutex<Connection>>, type_str: &str, datum: &Value) {
+    let conn = db.lock().unwrap();
+    refresh_favorite(&conn, type_str, datum);
 }
 
 fn start_syosetu_sync(state: AppState, module: ModuleType, interval: Duration) {
@@ -117,19 +125,7 @@ async fn sync_syosetu(state: &AppState, module: &ModuleType, type_str: &str) {
                     }
                 };
                 for datum in &data {
-                    let id = datum["id"].as_str().unwrap_or_default();
-                    let title = datum["title"].as_str();
-                    let new_page = datum["pages"].as_array().map(|a| a.len() as i64);
-                    let novelupdated_at = datum["novelupdated_at"].as_str();
-
-                    if title.is_some() || new_page.is_some() || novelupdated_at.is_some() {
-                        changed += tx
-                            .execute(
-                                REFRESH_FAVORITE_SQL,
-                                rusqlite::params![title, new_page, novelupdated_at, type_str, id],
-                            )
-                            .unwrap_or(0);
-                    }
+                    changed += refresh_favorite(&tx, type_str, datum);
                 }
                 let _ = tx.commit();
             }

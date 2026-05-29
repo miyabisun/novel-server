@@ -7,7 +7,7 @@ const MAX_ENTRIES: usize = 10_000;
 const SWEEP_INTERVAL: std::time::Duration = std::time::Duration::from_secs(3600);
 
 struct CacheEntry {
-    value: Value,
+    value: Arc<Value>,
     expires_at: Option<Instant>,
 }
 
@@ -22,7 +22,9 @@ impl Cache {
         }
     }
 
-    pub fn get(&self, key: &str) -> Option<Value> {
+    /// Returns a shared handle to the cached value; cloning the `Arc` only bumps
+    /// a refcount, so frequent hits avoid deep-cloning large JSON payloads.
+    pub fn get(&self, key: &str) -> Option<Arc<Value>> {
         let store = self.store.lock().unwrap();
         let entry = store.get(key)?;
         if let Some(expires_at) = entry.expires_at {
@@ -30,10 +32,12 @@ impl Cache {
                 return None;
             }
         }
-        Some(entry.value.clone())
+        Some(Arc::clone(&entry.value))
     }
 
-    pub fn set(&self, key: &str, value: Value, ttl_seconds: Option<u64>) {
+    /// Stores `value` and returns a shared handle to it, so the caller can serve
+    /// the same allocation it just cached without cloning.
+    pub fn set(&self, key: &str, value: Value, ttl_seconds: Option<u64>) -> Arc<Value> {
         let mut store = self.store.lock().unwrap();
         if store.len() >= MAX_ENTRIES && !store.contains_key(key) {
             // Remove the first (oldest inserted) entry
@@ -41,13 +45,15 @@ impl Cache {
                 store.remove(&oldest_key);
             }
         }
+        let value = Arc::new(value);
         store.insert(
             key.to_string(),
             CacheEntry {
-                value,
+                value: Arc::clone(&value),
                 expires_at: ttl_seconds.map(|s| Instant::now() + std::time::Duration::from_secs(s)),
             },
         );
+        value
     }
 
     fn sweep(&self) {
@@ -85,14 +91,14 @@ mod tests {
     fn set_and_get_without_ttl() {
         let cache = Cache::new();
         cache.set("key", json!("value"), None);
-        assert_eq!(cache.get("key"), Some(json!("value")));
+        assert_eq!(cache.get("key").as_deref(), Some(&json!("value")));
     }
 
     #[test]
     fn set_and_get_with_ttl() {
         let cache = Cache::new();
         cache.set("key", json!(42), Some(3600));
-        assert_eq!(cache.get("key"), Some(json!(42)));
+        assert_eq!(cache.get("key").as_deref(), Some(&json!(42)));
     }
 
     #[test]
@@ -109,7 +115,7 @@ mod tests {
         let cache = Cache::new();
         cache.set("key", json!("first"), None);
         cache.set("key", json!("second"), None);
-        assert_eq!(cache.get("key"), Some(json!("second")));
+        assert_eq!(cache.get("key").as_deref(), Some(&json!("second")));
     }
 
     #[test]
@@ -118,7 +124,7 @@ mod tests {
         cache.set("key", json!("forever"), None);
         // Even after sweep, no-TTL entries remain
         cache.sweep();
-        assert_eq!(cache.get("key"), Some(json!("forever")));
+        assert_eq!(cache.get("key").as_deref(), Some(&json!("forever")));
     }
 
     #[test]
@@ -129,7 +135,7 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_millis(10));
         cache.sweep();
         assert!(cache.get("expired").is_none());
-        assert_eq!(cache.get("alive"), Some(json!("new")));
+        assert_eq!(cache.get("alive").as_deref(), Some(&json!("new")));
     }
 
     #[test]
@@ -155,7 +161,7 @@ mod tests {
         cache.set("k0", json!("updated"), None);
         let store = cache.store.lock().unwrap();
         assert_eq!(store.len(), MAX_ENTRIES);
-        assert_eq!(store.get("k0").unwrap().value, json!("updated"));
+        assert_eq!(*store.get("k0").unwrap().value, json!("updated"));
     }
 
     #[test]
@@ -167,10 +173,10 @@ mod tests {
         cache.set("object", json!({"a": 1}), None);
         cache.set("null", json!(null), None);
 
-        assert_eq!(cache.get("string"), Some(json!("text")));
-        assert_eq!(cache.get("number"), Some(json!(123)));
-        assert_eq!(cache.get("array"), Some(json!([1, 2, 3])));
-        assert_eq!(cache.get("object"), Some(json!({"a": 1})));
-        assert_eq!(cache.get("null"), Some(json!(null)));
+        assert_eq!(cache.get("string").as_deref(), Some(&json!("text")));
+        assert_eq!(cache.get("number").as_deref(), Some(&json!(123)));
+        assert_eq!(cache.get("array").as_deref(), Some(&json!([1, 2, 3])));
+        assert_eq!(cache.get("object").as_deref(), Some(&json!({"a": 1})));
+        assert_eq!(cache.get("null").as_deref(), Some(&json!(null)));
     }
 }

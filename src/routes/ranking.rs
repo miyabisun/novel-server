@@ -6,10 +6,10 @@ use axum::routing::{get, patch};
 use axum::{Json, Router};
 use serde::Deserialize;
 use serde_json::Value;
+use std::sync::Arc;
 
 const RANKING_TTL: u64 = 60 * 60 * 3; // 3 hours
 const VALID_PERIODS: &[&str] = &["daily", "weekly", "monthly", "quarter", "yearly"];
-const QUARTER_UNSUPPORTED: &[&str] = &["kakuyomu"];
 
 #[derive(Deserialize)]
 struct RankingQuery {
@@ -44,7 +44,7 @@ async fn get_ranking(
     State(state): State<AppState>,
     Path(type_str): Path<String>,
     Query(query): Query<RankingQuery>,
-) -> Result<Json<Value>, AppError> {
+) -> Result<Json<Arc<Value>>, AppError> {
     fetch_ranking(state, &type_str, query.period.as_deref(), true).await
 }
 
@@ -68,7 +68,7 @@ async fn patch_ranking(
     State(state): State<AppState>,
     Path(type_str): Path<String>,
     Query(query): Query<RankingQuery>,
-) -> Result<Json<Value>, AppError> {
+) -> Result<Json<Arc<Value>>, AppError> {
     fetch_ranking(state, &type_str, query.period.as_deref(), false).await
 }
 
@@ -77,10 +77,10 @@ async fn fetch_ranking(
     type_str: &str,
     period: Option<&str>,
     use_cache: bool,
-) -> Result<Json<Value>, AppError> {
+) -> Result<Json<Arc<Value>>, AppError> {
     let module = ModuleType::resolve(type_str)?;
     let period = period.unwrap_or("daily");
-    validate_period(type_str, period)?;
+    validate_period(module, type_str, period)?;
 
     let key = format!("novel:{}:ranking:{}", type_str, period);
 
@@ -94,19 +94,45 @@ async fn fetch_ranking(
         .fetch_ranking_list(&state.http, 100, period)
         .await
         .map_err(|_| AppError::Upstream("Failed to fetch ranking".into()))?;
-    state.cache.set(&key, ranking.clone(), Some(RANKING_TTL));
-    Ok(Json(ranking))
+    Ok(Json(state.cache.set(&key, ranking, Some(RANKING_TTL))))
 }
 
-fn validate_period(type_str: &str, period: &str) -> Result<(), AppError> {
+fn validate_period(module: ModuleType, type_str: &str, period: &str) -> Result<(), AppError> {
     if !VALID_PERIODS.contains(&period) {
         return Err(AppError::BadRequest("Invalid period".into()));
     }
-    if period == "quarter" && QUARTER_UNSUPPORTED.contains(&type_str) {
+    if !module.supports_period(period) {
         return Err(AppError::BadRequest(format!(
-            "{} does not support quarter ranking",
-            type_str
+            "{} does not support {} ranking",
+            type_str, period
         )));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rejects_kakuyomu_quarter_with_message() {
+        let err = validate_period(ModuleType::Kakuyomu, "kakuyomu", "quarter").unwrap_err();
+        assert!(matches!(&err, AppError::BadRequest(m)
+            if m == "kakuyomu does not support quarter ranking"));
+    }
+
+    #[test]
+    fn allows_supported_combinations() {
+        // kakuyomu supports every period except quarter; narou supports all.
+        assert!(validate_period(ModuleType::Kakuyomu, "kakuyomu", "daily").is_ok());
+        assert!(validate_period(ModuleType::Kakuyomu, "kakuyomu", "yearly").is_ok());
+        assert!(validate_period(ModuleType::Narou, "narou", "quarter").is_ok());
+        assert!(validate_period(ModuleType::Nocturne, "nocturne", "quarter").is_ok());
+    }
+
+    #[test]
+    fn rejects_unknown_period() {
+        let err = validate_period(ModuleType::Narou, "narou", "hourly").unwrap_err();
+        assert!(matches!(&err, AppError::BadRequest(m) if m == "Invalid period"));
+    }
 }

@@ -6,6 +6,7 @@ use axum::extract::{Path, State};
 use axum::routing::{get, patch};
 use axum::{Json, Router};
 use serde_json::{json, Value};
+use std::sync::Arc;
 
 const PAGE_TTL: u64 = 60 * 60 * 24; // 24 hours
 
@@ -36,12 +37,12 @@ pub fn routes() -> Router<AppState> {
 async fn get_page(
     State(state): State<AppState>,
     Path((type_str, id, num)): Path<(String, String, String)>,
-) -> Result<Json<Value>, AppError> {
+) -> Result<Json<Arc<Value>>, AppError> {
     let module = ModuleType::resolve(&type_str)?;
     let key = format!("novel:{}:{}:page:{}", type_str, id, num);
 
     if let Some(cached) = state.cache.get(&key) {
-        return Ok(Json(json!({ "html": cached })));
+        return Ok(Json(cached));
     }
 
     fetch_and_cache(&state, &module, &id, &num, &key).await
@@ -67,7 +68,7 @@ async fn get_page(
 async fn patch_page(
     State(state): State<AppState>,
     Path((type_str, id, num)): Path<(String, String, String)>,
-) -> Result<Json<Value>, AppError> {
+) -> Result<Json<Arc<Value>>, AppError> {
     let module = ModuleType::resolve(&type_str)?;
     let key = format!("novel:{}:{}:page:{}", type_str, id, num);
 
@@ -80,12 +81,9 @@ async fn fetch_and_cache(
     id: &str,
     num: &str,
     key: &str,
-) -> Result<Json<Value>, AppError> {
+) -> Result<Json<Arc<Value>>, AppError> {
     let label = format!("fetchPage {}/{}/{}", id, num, key);
     let raw = super::with_retry(&label, || module.fetch_page(&state.http, id, num)).await?;
     let html = sanitize::clean(raw.as_deref().unwrap_or(""));
-    state
-        .cache
-        .set(key, Value::String(html.clone()), Some(PAGE_TTL));
-    Ok(Json(json!({ "html": html })))
+    Ok(Json(state.cache.set(key, json!({ "html": html }), Some(PAGE_TTL))))
 }

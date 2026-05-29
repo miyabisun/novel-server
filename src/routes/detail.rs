@@ -5,6 +5,7 @@ use axum::extract::{Path, State};
 use axum::routing::get;
 use axum::{Json, Router};
 use serde_json::Value;
+use std::sync::Arc;
 
 const DETAIL_TTL: u64 = 60 * 60 * 24; // 24 hours
 
@@ -32,7 +33,7 @@ pub fn routes() -> Router<AppState> {
 async fn get_detail(
     State(state): State<AppState>,
     Path((type_str, id)): Path<(String, String)>,
-) -> Result<Json<Value>, AppError> {
+) -> Result<Json<Arc<Value>>, AppError> {
     let module = ModuleType::resolve(&type_str)?;
     let key = format!("novel:{}:{}:detail", type_str, id);
 
@@ -42,6 +43,5 @@ async fn get_detail(
 
     let label = format!("fetchDetail {}/{}", type_str, id);
     let detail = super::with_retry(&label, || module.fetch_detail(&state.http, &id)).await?;
-    state.cache.set(&key, detail.clone(), Some(DETAIL_TTL));
-    Ok(Json(detail))
+    Ok(Json(state.cache.set(&key, detail, Some(DETAIL_TTL))))
 }

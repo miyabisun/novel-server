@@ -184,6 +184,10 @@ pub struct SyosetuSite {
     pub type_str: &'static str,
     pub genre_param: &'static str,
     pub ranking_genres: &'static [(&'static str, u32)],
+    /// Whether an unfiltered "総合" ranking is meaningful. False for single-genre
+    /// sites (e.g. nocturne), where the genre IS the whole site, so the sole
+    /// genre is reused as "総合" instead of fetching an unrelated cross-site list.
+    pub supports_overall_ranking: bool,
     pub over18: bool,
 }
 
@@ -199,6 +203,7 @@ pub static NAROU: SyosetuSite = SyosetuSite {
         ("ローファンタジー", 202),
         ("アクション", 306),
     ],
+    supports_overall_ranking: true,
     over18: false,
 };
 
@@ -208,6 +213,7 @@ pub static NOCTURNE: SyosetuSite = SyosetuSite {
     type_str: "nocturne",
     genre_param: "nocgenre",
     ranking_genres: &[("ノクターン", 1)],
+    supports_overall_ranking: false,
     over18: true,
 };
 
@@ -268,42 +274,24 @@ async fn site_api(
     fetch_api(client, site.api_url, params, None).await
 }
 
+/// Fetch a ranking page. `genre = Some(id)` filters to one genre; `None` fetches
+/// the unfiltered overall ranking.
 async fn fetch_ranking(
     site: &'static SyosetuSite,
     client: &reqwest::Client,
-    genre: u32,
+    genre: Option<u32>,
     limit: usize,
     order: &str,
 ) -> Result<Vec<Value>, AppError> {
-    site_api(
-        site,
-        client,
-        &[
-            ("of", OF_RANKING.to_string()),
-            ("lim", limit.to_string()),
-            ("order", order.to_string()),
-            (site.genre_param, genre.to_string()),
-        ],
-    )
-    .await
-}
-
-async fn fetch_overall_ranking(
-    site: &'static SyosetuSite,
-    client: &reqwest::Client,
-    limit: usize,
-    order: &str,
-) -> Result<Vec<Value>, AppError> {
-    site_api(
-        site,
-        client,
-        &[
-            ("of", OF_RANKING.to_string()),
-            ("lim", limit.to_string()),
-            ("order", order.to_string()),
-        ],
-    )
-    .await
+    let mut params = vec![
+        ("of", OF_RANKING.to_string()),
+        ("lim", limit.to_string()),
+        ("order", order.to_string()),
+    ];
+    if let Some(genre) = genre {
+        params.push((site.genre_param, genre.to_string()));
+    }
+    site_api(site, client, &params).await
 }
 
 pub async fn fetch_ranking_list(
@@ -326,18 +314,17 @@ pub async fn fetch_ranking_list(
         let client = client.clone();
         let order = order.to_string();
         handles.push(tokio::spawn(async move {
-            fetch_ranking(site, &client, genre_id, limit, &order).await
+            fetch_ranking(site, &client, Some(genre_id), limit, &order).await
         }));
     }
 
-    // Fetch overall ranking only for sites with multiple genres.
-    // For single-genre sites (e.g. nocturne), the genre IS the overall ranking,
-    // and fetching without genre filter would include unrelated works.
-    let overall_handle = if site.ranking_genres.len() > 1 {
+    // See `SyosetuSite::supports_overall_ranking`: only multi-genre sites get a
+    // separately-fetched unfiltered "総合" ranking.
+    let overall_handle = if site.supports_overall_ranking {
         let overall_client = client.clone();
         let overall_order = order.to_string();
         Some(tokio::spawn(async move {
-            fetch_overall_ranking(site, &overall_client, limit, &overall_order).await
+            fetch_ranking(site, &overall_client, None, limit, &overall_order).await
         }))
     } else {
         None
@@ -357,8 +344,15 @@ pub async fn fetch_ranking_list(
             .await
             .map_err(|e| AppError::Internal(e.to_string()))??;
         result.insert("総合".to_string(), Value::Array(overall_data));
-    } else if site.ranking_genres.len() == 1 {
-        // Single genre: reuse as "総合"
+    } else {
+        // No separate overall ranking: reuse the sole genre as "総合". This only
+        // makes sense for single-genre sites; reusing one of several genres would
+        // be a misleading "総合".
+        debug_assert_eq!(
+            site.ranking_genres.len(),
+            1,
+            "supports_overall_ranking=false requires a single genre"
+        );
         let single = result.values().next().cloned().unwrap_or(Value::Array(vec![]));
         result.insert("総合".to_string(), single);
     }

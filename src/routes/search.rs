@@ -6,6 +6,7 @@ use axum::routing::get;
 use axum::{Json, Router};
 use serde::Deserialize;
 use serde_json::Value;
+use std::sync::Arc;
 
 const SEARCH_TTL: u64 = 60 * 60; // 1 hour
 
@@ -40,7 +41,7 @@ async fn get_search(
     State(state): State<AppState>,
     Path(type_str): Path<String>,
     Query(query): Query<SearchQuery>,
-) -> Result<Json<Value>, AppError> {
+) -> Result<Json<Arc<Value>>, AppError> {
     let module = ModuleType::resolve(&type_str)?;
     let q = query
         .q
@@ -58,6 +59,5 @@ async fn get_search(
         .fetch_search(&state.http, q)
         .await
         .map_err(|_| AppError::Upstream("Failed to search".into()))?;
-    state.cache.set(&key, results.clone(), Some(SEARCH_TTL));
-    Ok(Json(results))
+    Ok(Json(state.cache.set(&key, results, Some(SEARCH_TTL))))
 }

@@ -150,11 +150,8 @@ pub async fn fetch_ranking(
 }
 
 pub async fn fetch_ranking_list(client: &reqwest::Client, period: &str) -> Result<Value, AppError> {
-    if period == "quarter" {
-        return Err(AppError::BadRequest(
-            "kakuyomu does not support quarter ranking".to_string(),
-        ));
-    }
+    // Period support (kakuyomu lacks "quarter") is validated at the route layer
+    // via ModuleType::supports_period before reaching here.
     let mut futures: Vec<_> = RANKING_GENRES
         .iter()
         .map(|(_, slug)| fetch_ranking(client, slug, period))

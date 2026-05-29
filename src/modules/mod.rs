@@ -31,6 +31,13 @@ impl ModuleType {
         }
     }
 
+    /// Whether this site publishes a ranking for the given period. kakuyomu has
+    /// no quarterly ranking; narou/nocturne support every period. Single source
+    /// of truth so route validation and the fetch path can't drift apart.
+    pub fn supports_period(&self, period: &str) -> bool {
+        !(matches!(self, Self::Kakuyomu) && period == "quarter")
+    }
+
     pub async fn fetch_ranking_list(
         &self,
         client: &reqwest::Client,
