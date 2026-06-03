@@ -66,6 +66,62 @@
 	--c-fav-border: rgba(255, 200, 50, 0.3)
 	--c-fav-hover: rgba(255, 200, 50, 0.1)
 
+// Light mode — OS設定がライトのときだけ :root の色変数を上書きする。
+// 形・余白・フォント系の変数はダークと共通なので、色だけ再定義すればよい。
+@media (prefers-color-scheme: light)
+	\:root
+		// ─────────────────────────────────────────────
+		// TODO(あなた): 電子ペーパー向けにこの8値を調整してください。
+		//   端末は階調が苦手で薄いグレーが潰れ／白飛びしやすいので、
+		//   「背景は思い切って白」「文字は十分濃く」「階層差は大きめ」が基本。
+		//   下の値は無難な出発点。実機で見て濃さ・コントラストを詰めてください。
+		//
+		// Surfaces（背景面）
+		--c-bg: #ffffff           // ページ全体の地。電子ペーパーで一番濃く出る純白を推奨
+		--c-surface: #f4f4f4      // カード等の一段手前の面。bg と差が出る程度に
+		--c-surface-hover: #ebebeb
+		--c-backdrop: rgba(0, 0, 0, 0.4)  // モーダル背後の覆い
+
+		// Borders（罫線）
+		--c-border: #cccccc
+		--c-border-strong: #999999
+
+		// Text hierarchy（文字の濃淡4段。電子ペーパーでは最濃を黒へ寄せる）
+		--c-text: rgba(0, 0, 0, 0.87)
+		--c-text-sub: rgba(0, 0, 0, 0.6)
+		--c-text-muted: rgba(0, 0, 0, 0.5)
+		--c-text-faint: rgba(0, 0, 0, 0.38)
+
+		// Interactive overlays（ホバー等の重ね。白地では「黒を薄く重ねる」）
+		--c-overlay-1: rgba(0, 0, 0, 0.04)
+		--c-overlay-2: rgba(0, 0, 0, 0.07)
+		--c-overlay-3: rgba(0, 0, 0, 0.12)
+		// ─────────────────────────────────────────────
+		// 以下のアクセント色は白背景向けに変換済み（調整不要だが好みで）
+
+		// Danger (red) — 白地では明るい赤が飛ぶので濃い赤へ
+		--c-danger: rgba(200, 40, 40, 0.95)
+		--c-danger-dim: rgba(200, 40, 40, 0.85)
+		--c-danger-bg: rgba(200, 40, 40, 0.12)
+		--c-danger-bg-hover: rgba(200, 40, 40, 0.2)
+		--c-danger-border: rgba(200, 40, 40, 0.4)
+		--c-danger-hover: rgba(200, 40, 40, 0.08)
+
+		// Accent (blue) — 淡い水色は白地で読めないので濃い青へ。hoverは更に濃く
+		--c-accent: rgba(20, 100, 200, 0.95)
+		--c-accent-hover: rgba(10, 70, 160, 1)
+		--c-accent-bg: rgba(20, 100, 200, 0.12)
+		--c-accent-bg-hover: rgba(20, 100, 200, 0.2)
+		--c-accent-border: rgba(20, 100, 200, 0.4)
+		--c-accent-subtle: rgba(20, 100, 200, 0.1)
+		--c-accent-active: rgba(20, 100, 200, 0.5)
+
+		// Favorite (gold) — 白地では金が見えないので濃いアンバーへ
+		--c-fav: rgba(180, 120, 0, 0.95)
+		--c-fav-bright: rgba(170, 110, 0, 1)
+		--c-fav-border: rgba(180, 120, 0, 0.45)
+		--c-fav-hover: rgba(180, 120, 0, 0.1)
+
 *,
 *::before,
 *::after
@@ -104,7 +160,7 @@ table
 
 	tr
 		&:hover
-			background-color: rgba(255, 255, 255, 0.2)
+			background-color: var(--c-overlay-3)
 
 ul
 	margin: 0
