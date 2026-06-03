@@ -88,7 +88,7 @@
 .toc-title
 	margin: 0
 	font-size: var(--fs-lg)
-	color: white
+	color: var(--c-text)
 	line-height: 1.4
 
 .retry-btn

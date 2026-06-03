@@ -137,12 +137,12 @@
 	line-height: 1
 
 	&:hover
-		color: white
+		color: var(--c-text)
 
 .title
 	margin: 0 0 var(--sp-4)
 	font-size: var(--fs-lg)
-	color: white
+	color: var(--c-text)
 	padding-right: 30px
 
 .synopsis

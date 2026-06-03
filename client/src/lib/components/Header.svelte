@@ -90,6 +90,6 @@ header
 		background: var(--c-overlay-1)
 
 	&.active
-		color: white
+		color: var(--c-text)
 		border-bottom-color: var(--tab-color)
 </style>
