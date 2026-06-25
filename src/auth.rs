@@ -15,7 +15,7 @@ pub async fn resolve_user(
     next: Next,
 ) -> Response {
     let user_id = match headers
-        .get("x-forwarded-email")
+        .get("cf-access-authenticated-user-email")
         .and_then(|v| v.to_str().ok())
     {
         Some(email) => get_or_create_user(&db, email),
