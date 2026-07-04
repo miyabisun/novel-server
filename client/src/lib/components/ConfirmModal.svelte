@@ -33,47 +33,48 @@
 	display: flex
 	align-items: center
 	justify-content: center
-	padding: var(--sp-5)
+	padding: var(--sp-xl)
 
 .modal
 	background: var(--c-surface)
-	border: 1px solid var(--c-border-strong)
+	border: 1px solid var(--c-border)
 	border-radius: var(--radius-lg)
-	padding: var(--sp-5)
+	padding: var(--sp-lg)
 	max-width: 360px
 	width: 100%
+	box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25)
 
 .modal-message
-	margin: 0 0 var(--sp-5)
-	font-size: var(--fs-md)
+	margin: 0 0 var(--sp-lg)
+	font-size: var(--fs-body)
 	color: var(--c-text)
 	line-height: 1.6
 	overflow-wrap: break-word
 
 .modal-actions
 	display: flex
-	gap: var(--sp-3)
+	gap: var(--sp-sm)
 	justify-content: flex-end
 
 .btn
-	padding: var(--sp-3) var(--sp-4)
-	border: 1px solid var(--c-border-strong)
+	padding: var(--sp-sm) var(--sp-lg)
+	border: 1px solid var(--c-border)
 	border-radius: var(--radius-sm)
 	cursor: pointer
-	font-size: var(--fs-sm)
+	font-size: var(--fs-label)
+	font-weight: 500
 
 .btn-cancel
 	background: transparent
-	color: var(--c-text-sub)
+	color: var(--c-text-muted)
 
 	&:hover
-		background: var(--c-overlay-2)
+		background: var(--c-border)
 
 .btn-delete
-	background: var(--c-danger-bg)
+	background: transparent
 	color: var(--c-danger)
-	border-color: var(--c-danger-border)
 
 	&:hover
-		background: var(--c-danger-bg-hover)
+		background: var(--c-danger-subtle)
 </style>

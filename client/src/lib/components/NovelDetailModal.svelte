@@ -3,6 +3,7 @@
 	import fetcher from '$lib/fetcher.js';
 	import { navigate } from '$lib/router.svelte.js';
 	import { decodeHtml } from '$lib/decode.js';
+	import Icon from '$lib/components/Icon.svelte';
 
 	let { type, novel, isFav = false, onToggleFav, onclose } = $props();
 
@@ -72,7 +73,7 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="backdrop" onclick={handleBackdrop}>
 	<div class="modal">
-		<button class="close-btn" onclick={onclose}>&times;</button>
+		<button class="close-btn" onclick={onclose} aria-label="閉じる"><Icon name="x" /></button>
 		<h2 class="title">{decodeHtml(novel.title)}</h2>
 
 		{#if loading}
@@ -94,9 +95,9 @@
 				{#if saving}
 					保存中...
 				{:else if isFav}
-					★ お気に入り解除
+					<Icon name="star-filled" /> お気に入り解除
 				{:else}
-					☆ お気に入り追加
+					<Icon name="star-outline" /> お気に入り追加
 				{/if}
 			</button>
 		</div>
@@ -112,73 +113,85 @@
 	display: flex
 	align-items: center
 	justify-content: center
-	padding: var(--sp-5)
+	padding: var(--sp-xl)
 
 .modal
 	background: var(--c-surface)
-	border: 1px solid var(--c-border-strong)
+	border: 1px solid var(--c-border)
 	border-radius: var(--radius-lg)
-	padding: var(--sp-5)
+	padding: var(--sp-lg)
 	max-width: 540px
 	width: 100%
 	max-height: 80vh
 	overflow-y: auto
 	position: relative
+	box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25)
 
 .close-btn
 	position: absolute
-	top: var(--sp-4)
-	right: var(--sp-4)
+	top: var(--sp-sm)
+	right: var(--sp-sm)
+	width: 36px
+	height: 36px
 	background: transparent
 	border: none
-	color: var(--c-text-sub)
-	font-size: var(--fs-xl)
+	border-radius: var(--radius-sm)
+	color: var(--c-text-muted)
 	cursor: pointer
 	line-height: 1
+	display: flex
+	align-items: center
+	justify-content: center
 
 	&:hover
 		color: var(--c-text)
 
 .title
-	margin: 0 0 var(--sp-4)
-	font-size: var(--fs-lg)
+	margin: 0 0 var(--sp-lg)
+	font-size: var(--fs-title)
+	font-weight: 600
 	color: var(--c-text)
-	padding-right: 30px
+	padding-right: 40px
 
 .synopsis
 	white-space: pre-wrap
 	color: var(--c-text)
-	font-size: var(--fs-sm)
+	font-size: var(--fs-body-sm)
 	line-height: 1.7
 	max-height: 40vh
 	overflow-y: auto
-	margin-bottom: var(--sp-5)
+	margin-bottom: var(--sp-lg)
 
 .actions
 	display: flex
-	gap: var(--sp-3)
+	gap: var(--sp-sm)
 
 .btn
-	padding: var(--sp-3) var(--sp-4)
-	border: 1px solid var(--c-border-strong)
+	padding: var(--sp-sm) var(--sp-lg)
+	border: 1px solid var(--c-border)
 	border-radius: var(--radius-sm)
 	cursor: pointer
-	font-size: var(--fs-sm)
+	font-size: var(--fs-label)
+	font-weight: 500
+	display: inline-flex
+	align-items: center
+	gap: var(--sp-xs)
 
 .btn-primary
-	background: var(--c-accent-bg)
-	color: var(--c-accent)
-	border-color: var(--c-accent-border)
+	background: var(--c-accent)
+	color: var(--c-surface)
+	border-color: var(--c-accent)
 
 	&:hover
-		background: var(--c-accent-bg-hover)
+		background: var(--c-accent-hover)
+		border-color: var(--c-accent-hover)
 
 .btn-toc
 	background: transparent
-	color: var(--c-text-sub)
+	color: var(--c-text-muted)
 
 	&:hover
-		background: var(--c-overlay-2)
+		background: var(--c-border)
 
 .btn-fav
 	background: transparent
@@ -190,5 +203,5 @@
 
 	&:disabled
 		cursor: default
-		opacity: 0.7
+		opacity: 0.5
 </style>

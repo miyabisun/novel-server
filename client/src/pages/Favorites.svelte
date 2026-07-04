@@ -4,6 +4,7 @@
 	import { link } from '$lib/router.svelte.js';
 	import { decodeHtml } from '$lib/decode.js';
 	import ConfirmModal from '$lib/components/ConfirmModal.svelte';
+	import Icon from '$lib/components/Icon.svelte';
 	import { typeColors } from '$lib/constants.js';
 
 	let favorites = $state([]);
@@ -77,7 +78,7 @@
 							<div class="card-title"><a href={link(`/novel/${fav.type}/${fav.id}/${Math.min((fav.read || 0) + 1, fav.page || 1)}`)}>{decodeHtml(fav.title)}</a></div>
 						</div>
 						<div class="card-actions">
-							<button class="delete-btn" onclick={() => confirmDelete(fav)}>✕</button>
+							<button class="delete-btn" onclick={() => confirmDelete(fav)} aria-label="削除"><Icon name="x" /></button>
 						</div>
 					</div>
 				</div>
@@ -96,16 +97,17 @@
 
 <style lang="sass">
 .favorites
-	padding: 0 var(--sp-4)
+	padding: 0 var(--sp-lg)
 
 .fav-grid
 	display: flex
 	flex-direction: column
-	gap: var(--sp-3)
+	gap: var(--sp-sm)
 
 .fav-wrapper
 	border-radius: var(--radius-md)
 	border: 1px solid var(--c-border)
+	background: var(--c-surface)
 
 .fav-card
 	display: flex
@@ -120,32 +122,32 @@
 	min-width: 0
 	display: flex
 	flex-direction: column
-	gap: var(--sp-1)
-	padding: var(--sp-3)
+	gap: var(--sp-xs)
+	padding: 10px
 
 .card-header
 	display: flex
 	justify-content: space-between
 	align-items: center
-	gap: var(--sp-3)
+	gap: var(--sp-md)
 
 .card-info
-	font-size: var(--fs-xs)
+	font-size: var(--fs-caption)
 	color: var(--c-text-muted)
 
 .card-updated
-	color: var(--c-text-faint)
-	margin-left: var(--sp-2)
+	margin-left: var(--sp-sm)
 
 .card-type
-	font-size: var(--fs-xs)
-	color: var(--type-color, rgba(255, 255, 255, 0.4))
-	border: 1px solid var(--type-color, rgba(255, 255, 255, 0.2))
+	font-size: var(--fs-caption)
+	color: var(--type-color)
+	border: 1px solid var(--type-color)
 	border-radius: var(--radius-sm)
-	padding: 1px var(--sp-2)
+	padding: 1px var(--sp-sm)
 	flex-shrink: 0
 
 .card-title
+	font-size: var(--fs-label)
 	line-height: 1.4
 
 	a
@@ -156,7 +158,7 @@
 			text-decoration: underline
 
 	@media (min-width: 769px)
-		font-size: var(--fs-md)
+		font-size: var(--fs-title)
 
 .card-actions
 	display: flex
@@ -165,16 +167,18 @@
 	border-left: 1px solid var(--c-border)
 
 .delete-btn
-	padding: 0 var(--sp-4)
+	padding: 0 var(--sp-lg)
 	border: none
 	background: transparent
-	color: var(--c-danger-dim)
+	color: var(--c-danger)
 	cursor: pointer
-	font-size: var(--fs-sm)
 	height: 100%
+	display: flex
+	align-items: center
+	justify-content: center
 
 	&:hover
-		background: var(--c-danger-hover)
+		background: var(--c-danger-subtle)
 
 @media (max-width: 799px)
 	.card-actions

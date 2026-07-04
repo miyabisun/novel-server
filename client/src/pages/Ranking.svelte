@@ -4,6 +4,7 @@
 	import { link } from '$lib/router.svelte.js';
 	import NovelDetailModal from '$lib/components/NovelDetailModal.svelte';
 	import ConfirmModal from '$lib/components/ConfirmModal.svelte';
+	import Icon from '$lib/components/Icon.svelte';
 	import { decodeHtml } from '$lib/decode.js';
 
 	let { type } = $props();
@@ -204,7 +205,7 @@
 					bind:value={searchQuery}
 					onkeydown={handleSearchKeydown}
 				/>
-				<button class="search-btn" onclick={executeSearch} disabled={searchLoading}>🔍</button>
+				<button class="search-btn" onclick={executeSearch} disabled={searchLoading} aria-label="検索"><Icon name="search" /></button>
 			</div>
 		{:else}
 			<select class="period-select" value={activePeriod} onchange={(e) => selectPeriod(e.target.value)}>
@@ -234,16 +235,16 @@
 								{#if !isSearchMode}
 									<span class="card-rank">{i + 1}位</span>
 								{/if}
-								<span class="card-page" class:tanpen={novel.noveltype === 2}>{novel.noveltype === 2 ? '短編' : `${novel.page}話`}</span>
+								<span class="card-page">{novel.noveltype === 2 ? '短編' : `${novel.page}話`}</span>
 							</div>
 							<div class="card-title"><a href={link(`/novel/${type}/${novel.id}/1`)}>{decodeHtml(novel.title)}</a></div>
 						</div>
 						<div class="card-actions">
-							<button class="detail-btn" onclick={() => selectedNovel = novel}>📖</button>
+							<button class="detail-btn" onclick={() => selectedNovel = novel} aria-label="詳細"><Icon name="book" /></button>
 							{#if favIds.has(novel.id)}
-								<button class="unfav-btn" onclick={() => confirmDelete(novel)}>✕</button>
+								<button class="unfav-btn" onclick={() => confirmDelete(novel)} aria-label="お気に入りから削除"><Icon name="x" /></button>
 							{:else}
-								<button class="fav-btn" onclick={() => addFavorite(novel)}>☆</button>
+								<button class="fav-btn" onclick={() => addFavorite(novel)} aria-label="お気に入りに追加"><Icon name="star-outline" /></button>
 							{/if}
 						</div>
 					</div>
@@ -275,26 +276,27 @@
 
 <style lang="sass">
 .ranking
-	padding: var(--sp-4) var(--sp-4) 0
+	padding: var(--sp-lg) var(--sp-lg) 0
 
 .toolbar
 	display: flex
 	justify-content: space-between
 	align-items: center
-	margin-bottom: var(--sp-4)
-	gap: var(--sp-3)
+	margin-bottom: var(--sp-lg)
+	gap: var(--sp-sm)
 	position: sticky
 	top: var(--header-h)
 	background: var(--c-bg)
 	z-index: 50
 
 .genre-select, .period-select
-	padding: var(--sp-2) var(--sp-3)
+	padding: var(--sp-sm) var(--sp-md)
 	border: 1px solid var(--c-border)
 	background: var(--c-surface)
 	color: var(--c-text)
-	border-radius: var(--radius-md)
-	font-size: var(--fs-sm)
+	border-radius: var(--radius-sm)
+	font-size: var(--fs-label)
+	font-weight: 500
 	cursor: pointer
 	appearance: auto
 	min-width: 0
@@ -309,38 +311,41 @@
 .search-box
 	display: flex
 	flex: 1
-	gap: var(--sp-1)
+	gap: var(--sp-sm)
 	min-width: 0
 
 .search-input
 	flex: 1
 	min-width: 0
-	padding: var(--sp-2) var(--sp-3)
+	padding: var(--sp-sm) var(--sp-md)
 	border: 1px solid var(--c-border)
 	background: var(--c-surface)
 	color: var(--c-text)
-	border-radius: var(--radius-md)
-	font-size: var(--fs-sm)
+	border-radius: var(--radius-sm)
+	font-size: var(--fs-body)
 
 	&::placeholder
 		color: var(--c-text-muted)
 
 	&:focus
-		outline: none
-		border-color: var(--c-accent-active)
+		border-color: var(--c-accent)
 
 .search-btn
 	flex-shrink: 0
-	padding: var(--sp-2) var(--sp-3)
+	padding: var(--sp-sm) var(--sp-md)
 	border: 1px solid var(--c-border)
 	background: var(--c-surface)
 	color: var(--c-text)
-	border-radius: var(--radius-md)
+	border-radius: var(--radius-sm)
+	font-size: var(--fs-label)
+	font-weight: 500
 	cursor: pointer
-	font-size: var(--fs-sm)
+	display: inline-flex
+	align-items: center
+	justify-content: center
 
 	&:hover
-		background: var(--c-overlay-2)
+		background: var(--c-border)
 
 	&:disabled
 		opacity: 0.5
@@ -349,11 +354,12 @@
 .novel-grid
 	display: flex
 	flex-direction: column
-	gap: var(--sp-3)
+	gap: var(--sp-sm)
 
 .novel-card-wrapper
 	border: 1px solid var(--c-border)
 	border-radius: var(--radius-md)
+	background: var(--c-surface)
 
 .novel-card
 	display: flex
@@ -366,27 +372,25 @@
 	min-width: 0
 	display: flex
 	flex-direction: column
-	gap: var(--sp-1)
-	padding: var(--sp-3)
+	gap: var(--sp-xs)
+	padding: 10px
 
 .card-header
 	display: flex
 	align-items: center
-	gap: var(--sp-3)
+	gap: var(--sp-md)
 
 .card-rank
-	font-size: var(--fs-xs)
+	font-size: var(--fs-caption)
 	font-weight: bold
 	color: var(--c-text-muted)
 
 .card-page
-	font-size: var(--fs-xs)
+	font-size: var(--fs-caption)
 	color: var(--c-text-muted)
 
-	&.tanpen
-		color: var(--c-text-faint)
-
 .card-title
+	font-size: var(--fs-label)
 	line-height: 1.4
 
 	a
@@ -413,14 +417,15 @@
 	display: flex
 	align-items: center
 	justify-content: center
-	font-size: var(--fs-sm)
 
 .detail-btn
 	border-bottom: 1px solid var(--c-border)
 	border-radius: 0 var(--radius-md) 0 0
+	color: var(--c-text-muted)
 
 	&:hover
 		background: var(--c-accent-subtle)
+		color: var(--c-accent)
 
 .fav-btn
 	border-radius: 0 0 var(--radius-md) 0
@@ -432,24 +437,23 @@
 
 .unfav-btn
 	border-radius: 0 0 var(--radius-md) 0
-	color: var(--c-danger-dim)
-	font-size: var(--fs-sm)
+	color: var(--c-danger)
 
 	&:hover
-		background: var(--c-danger-hover)
+		background: var(--c-danger-subtle)
 
 // Desktop
 @media (min-width: 800px)
 	.toolbar
-		padding-top: var(--sp-4)
-		padding-bottom: var(--sp-4)
+		padding-top: var(--sp-lg)
+		padding-bottom: var(--sp-lg)
 		margin-bottom: 0
 
 	.novel-card-wrapper:hover .novel-card
-		background-color: var(--c-overlay-2)
+		background-color: var(--c-surface-hover)
 
 	.card-title
-		font-size: var(--fs-md)
+		font-size: var(--fs-title)
 
 // Mobile
 @media (max-width: 799px)

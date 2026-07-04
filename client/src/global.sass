@@ -1,124 +1,100 @@
 \:root
-	// Spacing (φ-based, base=10px)
-	--sp-1: 4px
-	--sp-2: 6px
-	--sp-3: 10px
-	--sp-4: 16px
-	--sp-5: 26px
-	--sp-6: 42px
+	// Spacing (Sumi template 4px base scale)
+	--sp-xs: 4px
+	--sp-sm: 8px
+	--sp-md: 12px
+	--sp-lg: 16px
+	--sp-xl: 24px
+	--sp-gutter: 12px
 
-	// Font Size (φ-based, base=1rem)
-	--fs-xs: 0.72rem
-	--fs-sm: 0.85rem
-	--fs-md: 1rem
-	--fs-lg: 1.18rem
-	--fs-xl: 1.62rem
+	// Typography (Sumi template five roles: title / body / body-sm / label / caption)
+	--fs-title: 17px
+	--fs-body: 16px
+	--fs-body-sm: 14px
+	--fs-label: 15px
+	--fs-caption: 12px
 
-	// Header height (text + padding + nav-border 2px - margin 1px + header-border 1px)
-	--header-h: calc(var(--fs-sm) * 1.5715 + var(--sp-3) * 2 + 2px)
+	// Header height (nav-item: label line-box + vertical padding + nav-border 2px - margin 1px + header-border 1px)
+	--header-h: calc(var(--fs-label) * 1.6 + var(--sp-md) * 2 + 2px)
 
-	// Border Radius (φ-based, base=4px)
-	--radius-sm: 4px
-	--radius-md: 6px
-	--radius-lg: 10px
+	// Border Radius (Sumi template scale)
+	--radius-sm: 6px
+	--radius-md: 8px
+	--radius-lg: 12px
+	--radius-full: 9999px
 
-	// Surfaces
-	--c-bg: #222
-	--c-surface: #2a2a2a
-	--c-surface-hover: #2d2d2d
+	// Surfaces (Sumi = dark)
+	--c-bg: #191919
+	--c-surface: #232323
+	--c-surface-hover: #2b2b2b
 	--c-backdrop: rgba(0, 0, 0, 0.6)
 
-	// Borders
-	--c-border: #444
-	--c-border-strong: #555
+	// Borders (single hairline; border-strong collapsed into border)
+	--c-border: #333333
 
-	// Text hierarchy
-	--c-text: rgba(255, 255, 255, 0.85)
-	--c-text-sub: rgba(255, 255, 255, 0.6)
-	--c-text-muted: rgba(255, 255, 255, 0.5)
-	--c-text-faint: rgba(255, 255, 255, 0.35)
-
-	// Interactive overlays
-	--c-overlay-1: rgba(255, 255, 255, 0.05)
-	--c-overlay-2: rgba(255, 255, 255, 0.08)
-	--c-overlay-3: rgba(255, 255, 255, 0.15)
+	// Text hierarchy (on-surface + muted)
+	--c-text: #e6e6e6
+	--c-text-muted: #9a9a9a
 
 	// Danger (red)
-	--c-danger: rgba(255, 100, 100, 0.9)
-	--c-danger-dim: rgba(255, 100, 100, 0.8)
-	--c-danger-bg: rgba(255, 100, 100, 0.2)
-	--c-danger-bg-hover: rgba(255, 100, 100, 0.3)
-	--c-danger-border: rgba(255, 100, 100, 0.4)
-	--c-danger-hover: rgba(255, 100, 100, 0.15)
+	--c-danger: #ff6b6b
+	--c-danger-subtle: #3a1a1a
 
 	// Accent (blue)
 	--c-accent: rgba(128, 192, 255, 0.85)
 	--c-accent-hover: rgba(192, 222, 255, 0.85)
-	--c-accent-bg: rgba(128, 192, 255, 0.2)
-	--c-accent-bg-hover: rgba(128, 192, 255, 0.3)
-	--c-accent-border: rgba(128, 192, 255, 0.4)
 	--c-accent-subtle: rgba(128, 192, 255, 0.15)
-	--c-accent-active: rgba(128, 192, 255, 0.5)
 
-	// Favorite (gold)
+	// Focus ring (accent at 60% opacity)
+	--c-focus-ring: rgba(128, 192, 255, 0.6)
+
+	// Favorite (gold) — functional data color
 	--c-fav: rgba(255, 200, 50, 0.8)
 	--c-fav-bright: rgba(255, 200, 50, 1)
 	--c-fav-border: rgba(255, 200, 50, 0.3)
 	--c-fav-hover: rgba(255, 200, 50, 0.1)
+
+	// Site identity colors (functional data color; Sumi keeps the current 0.7-alpha hues)
+	--c-site-narou: rgba(100, 190, 120, 0.7)
+	--c-site-kakuyomu: rgba(100, 160, 220, 0.7)
+	--c-site-nocturne: rgba(200, 110, 110, 0.7)
+	--c-nav-favorite: rgba(220, 180, 50, 0.7)
 
 // Light mode — OS設定がライトのときだけ :root の色変数を上書きする。
 // 形・余白・フォント系の変数はダークと共通なので、色だけ再定義すればよい。
 @media (prefers-color-scheme: light)
 	\:root
 		// ─────────────────────────────────────────────
-		// TODO(あなた): 電子ペーパー向けにこの8値を調整してください。
+		// TODO(あなた): 電子ペーパー向けに Washi 値を実機で詰めてください。
 		//   端末は階調が苦手で薄いグレーが潰れ／白飛びしやすいので、
 		//   「背景は思い切って白」「文字は十分濃く」「階層差は大きめ」が基本。
-		//   下の値は無難な出発点。実機で見て濃さ・コントラストを詰めてください。
+		//   下の値はテンプレ準拠の出発点。実機で見て濃さ・コントラストを詰めてください。
 		//
-		// Surfaces（背景面）
+		// Surfaces
 		// 注意: --xxx の値の行末に // コメントを書くと値に混入する（Sassが剥がさない）
-		// ページ全体の地。電子ペーパーで一番濃く出る純白を推奨
-		--c-bg: #ffffff
-		// カード等の一段手前の面。bg と差が出る程度に
-		--c-surface: #f4f4f4
-		--c-surface-hover: #ebebeb
-		// モーダル背後の覆い
+		--c-bg: #fafafa
+		--c-surface: #ffffff
+		--c-surface-hover: #f0f0f0
 		--c-backdrop: rgba(0, 0, 0, 0.4)
 
-		// Borders（罫線）
-		--c-border: #cccccc
-		--c-border-strong: #999999
+		// Borders
+		--c-border: #c9c9c4
 
-		// Text hierarchy（文字の濃淡4段。電子ペーパーでは最濃を黒へ寄せる）
-		--c-text: rgba(0, 0, 0, 0.87)
-		--c-text-sub: rgba(0, 0, 0, 0.6)
-		--c-text-muted: rgba(0, 0, 0, 0.5)
-		--c-text-faint: rgba(0, 0, 0, 0.38)
+		// Text hierarchy（電子ペーパーでは最濃を黒へ寄せる）
+		--c-text: #222222
+		--c-text-muted: #4a4a4a
 
-		// Interactive overlays（ホバー等の重ね。白地では「黒を薄く重ねる」）
-		--c-overlay-1: rgba(0, 0, 0, 0.04)
-		--c-overlay-2: rgba(0, 0, 0, 0.07)
-		--c-overlay-3: rgba(0, 0, 0, 0.12)
-		// ─────────────────────────────────────────────
-		// 以下のアクセント色は白背景向けに変換済み（調整不要だが好みで）
+		// Danger (red) — 白地では濃い赤へ（≥7:1）
+		--c-danger: #8f1d16
+		--c-danger-subtle: #fdeeee
 
-		// Danger (red) — 白地では明るい赤が飛ぶので濃い赤へ
-		--c-danger: rgba(200, 40, 40, 0.95)
-		--c-danger-dim: rgba(200, 40, 40, 0.85)
-		--c-danger-bg: rgba(200, 40, 40, 0.12)
-		--c-danger-bg-hover: rgba(200, 40, 40, 0.2)
-		--c-danger-border: rgba(200, 40, 40, 0.4)
-		--c-danger-hover: rgba(200, 40, 40, 0.08)
-
-		// Accent (blue) — 淡い水色は白地で読めないので濃い青へ。hoverは更に濃く
+		// Accent (blue) — 淡い水色は白地で読めないので濃い青へ
 		--c-accent: rgba(20, 100, 200, 0.95)
 		--c-accent-hover: rgba(10, 70, 160, 1)
-		--c-accent-bg: rgba(20, 100, 200, 0.12)
-		--c-accent-bg-hover: rgba(20, 100, 200, 0.2)
-		--c-accent-border: rgba(20, 100, 200, 0.4)
 		--c-accent-subtle: rgba(20, 100, 200, 0.1)
-		--c-accent-active: rgba(20, 100, 200, 0.5)
+
+		// Focus ring
+		--c-focus-ring: rgba(20, 100, 200, 0.6)
 
 		// Favorite (gold) — 白地では金が見えないので濃いアンバーへ
 		--c-fav: rgba(180, 120, 0, 0.95)
@@ -126,16 +102,31 @@
 		--c-fav-border: rgba(180, 120, 0, 0.45)
 		--c-fav-hover: rgba(180, 120, 0, 0.1)
 
+		// ─────────────────────────────────────────────
+		// TODO(あなた): サイト識別色の Washi 値も実機で詰めてください。
+		//   電子ペーパーでは hue より濃度が手掛かり。ink-first で十分濃く。
+		//   下は暫定の darkness-ramp シード値。
+		--c-site-narou: #1f6b3a
+		--c-site-kakuyomu: #14508c
+		--c-site-nocturne: #8f2b2b
+		--c-nav-favorite: #8a6a00
+
 *,
 *::before,
 *::after
 	box-sizing: border-box
 
+// Shared focus ring (all interactive elements). The UA default ring is
+// superseded here and never removed outright.
+\:focus-visible
+	outline: 2px solid var(--c-focus-ring)
+	outline-offset: 2px
+
 body
 	background-color: var(--c-bg)
 	color: var(--c-text)
-	font-size: clamp(12px, 1vw, 18px)
-	line-height: 1.5715
+	font-size: var(--fs-body)
+	line-height: 1.6
 
 h1, h2, h3, h4, h5, h6
 	color: var(--c-text)
@@ -153,18 +144,18 @@ table
 	width: 100%
 
 	thead th
-		padding: var(--sp-2) var(--sp-1)
-		border-bottom: 3px gray double
-		font-size: var(--fs-md)
+		padding: var(--sp-sm) var(--sp-xs)
+		border-bottom: 3px double var(--c-border)
+		font-size: var(--fs-body)
 
 	tbody td
-		padding: var(--sp-2) var(--sp-1)
+		padding: var(--sp-sm) var(--sp-xs)
 		vertical-align: top
-		font-size: var(--fs-md)
+		font-size: var(--fs-body)
 
 	tr
 		&:hover
-			background-color: var(--c-overlay-3)
+			background-color: var(--c-surface-hover)
 
 ul
 	margin: 0
@@ -177,34 +168,34 @@ li
 
 .status
 	text-align: center
-	padding: var(--sp-5)
-	color: var(--c-text-sub)
+	padding: var(--sp-xl)
+	color: var(--c-text-muted)
 
 	&.error
-		color: #ff6b6b
+		color: var(--c-danger)
 
 .swipe-hint
 	position: fixed
 	top: 50%
 	transform: translateY(-50%)
-	padding: var(--sp-4)
-	background: rgba(0, 0, 0, 0.7)
-	color: var(--c-text-sub)
-	font-size: var(--fs-sm)
+	padding: var(--sp-lg)
+	background: var(--c-backdrop)
+	color: var(--c-text-muted)
+	font-size: var(--fs-body-sm)
 	border-radius: var(--radius-lg)
 	z-index: 100
 	pointer-events: none
-	transition: background 0.15s, color 0.15s
+	transition: color 0.15s
 
 	&.left
-		left: var(--sp-4)
+		left: var(--sp-lg)
 
 	&.right
-		right: var(--sp-4)
+		right: var(--sp-lg)
 
+	// Gesture "release" threshold is signalled with accent, per the template.
 	&.ready
-		background: rgba(0, 0, 0, 0.85)
-		color: rgba(255, 255, 255, 0.95)
+		color: var(--c-accent)
 
 	&.disabled
-		color: rgba(255, 255, 255, 0.55)
+		color: var(--c-text-muted)

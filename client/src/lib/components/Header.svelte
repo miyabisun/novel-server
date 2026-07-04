@@ -41,7 +41,7 @@ header
 	position: sticky
 	top: 0
 	z-index: 100
-	padding: 0 var(--sp-4)
+	padding: 0 var(--sp-lg)
 	display: flex
 	align-items: center
 	justify-content: space-between
@@ -55,8 +55,8 @@ header
 
 .nav-right
 	color: var(--c-text-muted)
-	font-size: var(--fs-sm)
-	padding: var(--sp-3) 0
+	font-size: var(--fs-caption)
+	padding: var(--sp-md) 0
 	white-space: nowrap
 	overflow: hidden
 	text-overflow: ellipsis
@@ -67,9 +67,9 @@ header
 
 .title
 	color: var(--c-text-muted)
-	font-size: var(--fs-sm)
-	padding: var(--sp-3) var(--sp-4) var(--sp-3) 0
-	margin-right: var(--sp-1)
+	font-size: var(--fs-label)
+	padding: var(--sp-md) var(--sp-lg) var(--sp-md) 0
+	margin-right: var(--sp-xs)
 	border-right: 1px solid var(--c-border)
 	user-select: none
 	pointer-events: none
@@ -78,16 +78,17 @@ header
 		display: none
 
 .nav-item
-	padding: var(--sp-3) var(--sp-4)
-	color: var(--c-text-sub)
+	padding: var(--sp-md) var(--sp-lg)
+	color: var(--c-text-muted)
 	text-decoration: none
-	font-size: var(--fs-sm)
+	font-size: var(--fs-label)
+	font-weight: 500
 	border-bottom: 2px solid transparent
 	margin-bottom: -1px
 
+	// Tabs never change background (template rule): only color + underline.
 	&:hover
 		color: var(--c-text)
-		background: var(--c-overlay-1)
 
 	&.active
 		color: var(--c-text)

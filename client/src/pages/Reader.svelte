@@ -4,6 +4,7 @@
 	import { navigate } from '$lib/router.svelte.js';
 	import { decodeHtml } from '$lib/decode.js';
 	import ConfirmModal from '$lib/components/ConfirmModal.svelte';
+	import Icon from '$lib/components/Icon.svelte';
 
 	let { params } = $props();
 	let html = $state('');
@@ -212,9 +213,9 @@
 		<button class="toc-btn" onclick={() => navigate(`/novel/${params.type}/${params.id}/toc`)} disabled={totalPages <= 1}>目次</button>
 		<button class="nav-btn" onclick={() => goTo(currentNum + 1)} disabled={!canGoNext}>次</button>
 		{#if isFav}
-			<button class="fav-btn-remove" onclick={handleFavClick} disabled={favSaving || !title}>✕</button>
+			<button class="fav-btn-remove" onclick={handleFavClick} disabled={favSaving || !title} aria-label="お気に入りから削除"><Icon name="x" /></button>
 		{:else}
-			<button class="fav-btn" onclick={handleFavClick} disabled={favSaving || !title}>☆</button>
+			<button class="fav-btn" onclick={handleFavClick} disabled={favSaving || !title} aria-label="お気に入りに追加"><Icon name="star-outline" /></button>
 		{/if}
 	</div>
 </nav>
@@ -249,7 +250,7 @@
 
 <style lang="sass">
 .reader
-	padding: 0 var(--sp-4)
+	padding: 0 var(--sp-lg)
 	max-width: 800px
 	margin: 0 auto
 
@@ -257,10 +258,10 @@
 	display: flex
 	align-items: center
 	justify-content: space-between
-	padding: var(--sp-3) 2.5%
+	padding: var(--sp-sm) 2.5%
 	background: var(--c-surface)
 	border-bottom: 1px solid var(--c-border)
-	gap: var(--sp-3)
+	gap: var(--sp-sm)
 	z-index: 50
 
 	&.top
@@ -268,8 +269,8 @@
 		top: var(--header-h)
 
 .bar-title
-	color: var(--c-text-sub)
-	font-size: var(--fs-sm)
+	color: var(--c-text-muted)
+	font-size: var(--fs-label)
 	white-space: nowrap
 	overflow: hidden
 	text-overflow: ellipsis
@@ -279,29 +280,30 @@
 .bar-right
 	display: flex
 	align-items: center
-	gap: var(--sp-1)
+	gap: var(--sp-xs)
 	flex-shrink: 0
 
 .bar-page
 	color: var(--c-text-muted)
-	font-size: var(--fs-xs)
-	margin-right: var(--sp-1)
+	font-size: var(--fs-caption)
+	margin-right: var(--sp-xs)
 	white-space: nowrap
 
 .nav-btn
-	padding: var(--sp-1) var(--sp-4)
-	border: 1px solid var(--c-border-strong)
+	padding: var(--sp-xs) var(--sp-lg)
+	border: 1px solid var(--c-border)
 	background: transparent
-	color: var(--c-text-sub)
+	color: var(--c-text-muted)
 	cursor: pointer
 	border-radius: var(--radius-sm)
-	font-size: var(--fs-sm)
+	font-size: var(--fs-label)
+	font-weight: 500
 
 	&:hover:not(:disabled)
-		background: var(--c-overlay-2)
+		background: var(--c-border)
 
 	&:disabled
-		opacity: 0.3
+		opacity: 0.5
 		cursor: not-allowed
 
 	@media (max-width: 768px)
@@ -309,57 +311,62 @@
 			display: none
 
 .toc-btn
-	padding: var(--sp-1) var(--sp-3)
-	border: 1px solid var(--c-border-strong)
+	padding: var(--sp-xs) var(--sp-md)
+	border: 1px solid var(--c-border)
 	background: transparent
-	color: var(--c-text-sub)
+	color: var(--c-text-muted)
 	cursor: pointer
 	border-radius: var(--radius-sm)
-	font-size: var(--fs-sm)
+	font-size: var(--fs-label)
+	font-weight: 500
 
 	&:hover:not(:disabled)
-		background: var(--c-overlay-2)
+		background: var(--c-border)
 
 	&:disabled
-		opacity: 0.3
+		opacity: 0.5
 		cursor: not-allowed
 
 .fav-btn
-	padding: var(--sp-1) var(--sp-3)
+	padding: var(--sp-xs) var(--sp-md)
 	border: 1px solid var(--c-fav-border)
 	background: transparent
 	color: var(--c-fav)
 	cursor: pointer
 	border-radius: var(--radius-sm)
-	font-size: var(--fs-md)
+	font-weight: 500
+	display: inline-flex
+	align-items: center
 
 	&:hover:not(:disabled)
 		background: var(--c-fav-hover)
 
 	&:disabled
 		cursor: default
-		opacity: 0.7
+		opacity: 0.5
 
 .fav-btn-remove
-	padding: var(--sp-1) var(--sp-3)
-	border: 1px solid var(--c-danger-border)
+	padding: var(--sp-xs) var(--sp-md)
+	border: 1px solid var(--c-border)
 	background: transparent
-	color: var(--c-danger-dim)
+	color: var(--c-danger)
 	cursor: pointer
 	border-radius: var(--radius-sm)
-	font-size: var(--fs-md)
+	font-weight: 500
+	display: inline-flex
+	align-items: center
 
 	&:hover:not(:disabled)
-		background: var(--c-danger-hover)
+		background: var(--c-danger-subtle)
 
 	&:disabled
 		cursor: default
-		opacity: 0.7
+		opacity: 0.5
 
 .content
-	padding: var(--sp-4) 0
-	line-height: 2
-	font-size: 1.05rem
+	padding: var(--sp-lg) 0
+	line-height: 1.6
+	font-size: var(--fs-body)
 
 	:global(p)
 		margin: 0 0 1em 0

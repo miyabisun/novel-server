@@ -78,43 +78,45 @@
 
 <style lang="sass">
 .toc
-	padding: 0 var(--sp-4) var(--sp-5)
+	padding: 0 var(--sp-lg) var(--sp-xl)
 	max-width: 800px
 	margin: 0 auto
 
 .toc-header
-	padding: var(--sp-5) 0 var(--sp-4)
+	padding: var(--sp-xl) 0 var(--sp-lg)
 
 .toc-title
 	margin: 0
-	font-size: var(--fs-lg)
+	font-size: var(--fs-title)
+	font-weight: 600
 	color: var(--c-text)
-	line-height: 1.4
+	line-height: 1.3
 
 .retry-btn
-	padding: var(--sp-2) var(--sp-4)
-	border: 1px solid var(--c-border-strong)
+	padding: var(--sp-sm) var(--sp-lg)
+	border: 1px solid var(--c-border)
 	background: transparent
-	color: var(--c-text-sub)
+	color: var(--c-text-muted)
 	cursor: pointer
 	border-radius: var(--radius-sm)
-	font-size: var(--fs-sm)
+	font-size: var(--fs-label)
 
 	&:hover
-		background: var(--c-overlay-2)
+		background: var(--c-border)
 
 .ep-list
 	display: flex
 	flex-direction: column
-	gap: var(--sp-2)
+	gap: var(--sp-sm)
 
 .ep-card
 	display: flex
 	align-items: baseline
-	gap: var(--sp-3)
-	padding: var(--sp-3)
+	gap: var(--sp-md)
+	padding: 10px
 	border: 1px solid var(--c-border)
 	border-radius: var(--radius-md)
+	background: var(--c-surface)
 	text-decoration: none
 	color: inherit
 
@@ -126,11 +128,12 @@
 
 .ep-num
 	flex-shrink: 0
-	font-size: var(--fs-xs)
+	font-size: var(--fs-caption)
 	color: var(--c-text-muted)
 	min-width: 3ch
 	text-align: right
 
 .ep-title
+	font-size: var(--fs-label)
 	line-height: 1.4
 </style>
