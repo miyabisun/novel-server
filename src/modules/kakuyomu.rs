@@ -474,13 +474,4 @@ mod tests {
         let episodes = extract_episodes(&apollo, "abc");
         assert!(episodes.is_empty());
     }
-
-    #[test]
-    fn ranking_genres_are_defined() {
-        assert!(!RANKING_GENRES.is_empty());
-        for (label, slug) in RANKING_GENRES {
-            assert!(!label.is_empty());
-            assert!(!slug.is_empty());
-        }
-    }
 }

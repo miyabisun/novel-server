@@ -1,6 +1,6 @@
 use rusqlite::Connection;
 
-const SCHEMA: &str = "
+pub(crate) const SCHEMA: &str = "
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         email TEXT NOT NULL UNIQUE

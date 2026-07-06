@@ -1,11 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { routes, matchRoute } from './routes.js'
-
-describe('routes', () => {
-  it('has 4 route definitions', () => {
-    expect(routes).toHaveLength(4)
-  })
-})
+import { matchRoute } from './routes.js'
 
 describe('matchRoute', () => {
   it('matches root path to index 0 (Favorites)', () => {

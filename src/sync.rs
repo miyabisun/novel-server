@@ -182,19 +182,7 @@ mod tests {
         title: &str,
     ) -> Arc<Mutex<Connection>> {
         let conn = Connection::open_in_memory().unwrap();
-        conn.execute_batch(
-            "CREATE TABLE favorites (
-                user_id INTEGER NOT NULL DEFAULT 1,
-                type TEXT NOT NULL,
-                id TEXT NOT NULL,
-                title TEXT NOT NULL,
-                novelupdated_at TEXT,
-                page INTEGER NOT NULL,
-                read INTEGER NOT NULL DEFAULT 0,
-                PRIMARY KEY (user_id, type, id)
-            );",
-        )
-        .unwrap();
+        conn.execute_batch(crate::db::SCHEMA).unwrap();
         conn.execute(
             "INSERT INTO favorites (user_id, type, id, title, novelupdated_at, page)
              VALUES (1, 'narou', 'n1234ab', ?1, ?2, ?3)",
