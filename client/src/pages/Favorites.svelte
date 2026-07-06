@@ -97,7 +97,7 @@
 
 <style lang="sass">
 .favorites
-	padding: 0 var(--sp-lg)
+	padding: var(--sp-sm) var(--sp-lg) 0
 
 .fav-grid
 	display: flex
