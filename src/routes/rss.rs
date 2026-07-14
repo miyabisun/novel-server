@@ -78,7 +78,8 @@ async fn get_rss(
 }
 
 /// Derive the base URL from request headers (reverse proxy or direct access).
-fn resolve_base_url(headers: &HeaderMap, config: &crate::config::Config) -> String {
+/// Shared with the /api/news JSON Feed (routes::news).
+pub(super) fn resolve_base_url(headers: &HeaderMap, config: &crate::config::Config) -> String {
     let proto = headers
         .get("x-forwarded-proto")
         .and_then(|v| v.to_str().ok())
@@ -102,8 +103,14 @@ fn escape_xml(s: &str) -> String {
         .replace('\'', "&apos;")
 }
 
+/// The page a reader should jump to: first unread page, clamped to the last
+/// existing page. Shared with the /api/news JSON Feed (routes::news).
+pub(super) fn next_page(read: i64, page: i64) -> i64 {
+    (read + 1).min(page.max(1))
+}
+
 fn build_item_xml(item: &FeedItem, base: &str) -> String {
-    let next_page = (item.read + 1).min(item.page.max(1));
+    let next_page = next_page(item.read, item.page);
     let link = format!("{}/novel/{}/{}/{}", base, item.type_str, item.id, next_page);
     let mut xml = String::from("<item>\n");
     xml.push_str(&format!("<title>{}</title>\n", escape_xml(&item.title)));

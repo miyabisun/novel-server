@@ -1,6 +1,7 @@
 mod auth;
 mod detail;
 mod favorites;
+mod news;
 mod pages;
 mod ranking;
 mod rss;
@@ -41,6 +42,7 @@ use utoipa_swagger_ui::SwaggerUi;
         favorites::delete_favorite,
         favorites::patch_progress,
         rss::get_rss,
+        news::get_news,
         auth::get_me,
     ),
     components(schemas(
@@ -105,6 +107,7 @@ pub fn build_router(state: AppState) -> Router {
         .merge(search::routes())
         .merge(toc::routes())
         .merge(rss::routes())
+        .merge(news::routes())
         .merge(auth::routes())
         .layer(middleware::from_fn_with_state(
             state.db.clone(),
