@@ -129,7 +129,12 @@ async fn sync_syosetu(state: &AppState, module: &ModuleType, type_str: &str) {
                 }
                 let _ = tx.commit();
             }
-            tracing::info!("[sync] {}: checked {} items, {} changed", type_str, data.len(), changed);
+            tracing::info!(
+                "[sync] {}: checked {} items, {} changed",
+                type_str,
+                data.len(),
+                changed
+            );
         }
         Err(e) => {
             tracing::error!("[sync] {} error: {}", type_str, e);
@@ -224,7 +229,11 @@ mod tests {
         // the old change-detection guard skipped unchanged rows, so the timestamp
         // stayed NULL and the favorite sank to the bottom of the list.)
         let db = db_with_favorite(None, 3, "Stale Novel");
-        update_favorite_from_datum(&db, "narou", &datum("Stale Novel", 3, Some("2024-03-15 10:00:00")));
+        update_favorite_from_datum(
+            &db,
+            "narou",
+            &datum("Stale Novel", 3, Some("2024-03-15 10:00:00")),
+        );
         assert_eq!(stored(&db).1.as_deref(), Some("2024-03-15 10:00:00"));
     }
 
@@ -233,7 +242,11 @@ mod tests {
         // A row previously stamped with a (now-removed) crawl time is corrected to
         // the real publication time on the next sync.
         let db = db_with_favorite(Some("2026-05-20 10:00:00"), 3, "Novel");
-        update_favorite_from_datum(&db, "narou", &datum("Novel", 3, Some("2026-05-20 09:55:00")));
+        update_favorite_from_datum(
+            &db,
+            "narou",
+            &datum("Novel", 3, Some("2026-05-20 09:55:00")),
+        );
         assert_eq!(stored(&db).1.as_deref(), Some("2026-05-20 09:55:00"));
     }
 

@@ -1,6 +1,7 @@
 <script>
 	import config from '$lib/config.js';
 	import fetcher from '$lib/fetcher.js';
+	import { removeFavorite as removeFavoriteRequest } from '$lib/favorites.js';
 	import { link } from '$lib/router.svelte.js';
 	import { decodeHtml } from '$lib/decode.js';
 	import ConfirmModal from '$lib/components/ConfirmModal.svelte';
@@ -26,7 +27,7 @@
 
 	async function removeFavorite(type, id) {
 		try {
-			await fetcher(`${config.path.api}/favorites/${type}/${id}`, { method: 'DELETE' });
+			await removeFavoriteRequest(type, id);
 			favorites = favorites.filter((f) => !(f.type === type && f.id === id));
 		} catch (e) {
 			alert(e.message);

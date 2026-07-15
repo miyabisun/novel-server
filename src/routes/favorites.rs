@@ -19,6 +19,19 @@ fn map_favorite_row(row: &rusqlite::Row) -> rusqlite::Result<Value> {
     }))
 }
 
+fn find_favorite(
+    db: &rusqlite::Connection,
+    user_id: i64,
+    type_str: &str,
+    id: &str,
+) -> rusqlite::Result<Value> {
+    let mut stmt = db.prepare(
+        "SELECT type, id, title, novelupdated_at, page, read FROM favorites
+         WHERE user_id = ?1 AND type = ?2 AND id = ?3",
+    )?;
+    stmt.query_row(rusqlite::params![user_id, type_str, id], map_favorite_row)
+}
+
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/api/favorites", get(get_favorites))
@@ -110,10 +123,7 @@ async fn put_favorite(
              ON CONFLICT(user_id, type, id) DO UPDATE SET title = ?4, page = ?5, novelupdated_at = ?6",
             rusqlite::params![user_id.0, type_str, id, title, page, novelupdated_at],
         )?;
-        let mut stmt = db.prepare(
-            "SELECT type, id, title, novelupdated_at, page, read FROM favorites WHERE user_id = ?1 AND type = ?2 AND id = ?3",
-        )?;
-        stmt.query_row(rusqlite::params![user_id.0, type_str, id], map_favorite_row)?
+        find_favorite(&db, user_id.0, &type_str, &id)?
     };
 
     // Fire-and-forget: fetch metadata immediately after adding
@@ -215,13 +225,7 @@ async fn patch_progress(
         if changes == 0 {
             return Ok(Json(json!({ "ok": true })));
         }
-        let mut stmt = db.prepare(
-            "SELECT type, id, title, novelupdated_at, page, read FROM favorites WHERE user_id = ?1 AND type = ?2 AND id = ?3",
-        )?;
-        stmt.query_row(
-            rusqlite::params![user_id.0, type_str, id],
-            map_favorite_row,
-        )?
+        find_favorite(&db, user_id.0, &type_str, &id)?
     };
     Ok(Json(result))
 }

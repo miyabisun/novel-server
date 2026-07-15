@@ -30,11 +30,9 @@ fn get_or_create_user(db: &Arc<Mutex<Connection>>, email: &str) -> UserId {
     conn.execute("INSERT OR IGNORE INTO users (email) VALUES (?1)", [email])
         .ok();
     let id = conn
-        .query_row(
-            "SELECT id FROM users WHERE email = ?1",
-            [email],
-            |row| row.get::<_, i64>(0),
-        )
+        .query_row("SELECT id FROM users WHERE email = ?1", [email], |row| {
+            row.get::<_, i64>(0)
+        })
         .unwrap_or(1); // fallback to guest
     UserId(id)
 }

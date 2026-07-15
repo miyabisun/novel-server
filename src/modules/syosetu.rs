@@ -353,7 +353,11 @@ pub async fn fetch_ranking_list(
             1,
             "supports_overall_ranking=false requires a single genre"
         );
-        let single = result.values().next().cloned().unwrap_or(Value::Array(vec![]));
+        let single = result
+            .values()
+            .next()
+            .cloned()
+            .unwrap_or(Value::Array(vec![]));
         result.insert("総合".to_string(), single);
     }
     Ok(Value::Object(result))

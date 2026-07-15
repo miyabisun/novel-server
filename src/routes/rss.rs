@@ -11,14 +11,7 @@ pub fn routes() -> Router<AppState> {
     Router::new().route("/api/rss", get(get_rss))
 }
 
-struct FeedItem {
-    type_str: String,
-    id: String,
-    title: String,
-    novelupdated_at: Option<String>,
-    page: i64,
-    read: i64,
-}
+use super::feed::{load_favorite_updates, next_page, resolve_base_url, FavoriteUpdate};
 
 #[utoipa::path(
     get,
@@ -36,25 +29,7 @@ async fn get_rss(
     Extension(user_id): Extension<UserId>,
     headers: HeaderMap,
 ) -> Result<impl IntoResponse, AppError> {
-    let items = {
-        let db = state.db.lock().unwrap();
-        let mut stmt = db.prepare(
-            "SELECT type, id, title, novelupdated_at, page, read FROM favorites
-             WHERE user_id = ?1 AND page - read > 0 AND page - read < 10
-             ORDER BY novelupdated_at DESC NULLS LAST",
-        )?;
-        let rows = stmt.query_map([user_id.0], |row| {
-            Ok(FeedItem {
-                type_str: row.get(0)?,
-                id: row.get(1)?,
-                title: row.get(2)?,
-                novelupdated_at: row.get(3)?,
-                page: row.get(4)?,
-                read: row.get(5)?,
-            })
-        })?;
-        rows.collect::<Result<Vec<_>, _>>()?
-    };
+    let items = load_favorite_updates(&state.db.lock().unwrap(), user_id.0)?;
 
     let base = resolve_base_url(&headers, &state.config);
 
@@ -74,29 +49,10 @@ async fn get_rss(
 
     xml.push_str("</channel>\n</rss>");
 
-    Ok(([(header::CONTENT_TYPE, "application/rss+xml; charset=utf-8")], xml))
-}
-
-/// Derive the base URL from request headers (reverse proxy or direct access).
-/// Shared with the /api/news JSON Feed (routes::news).
-pub(super) fn resolve_base_url(headers: &HeaderMap, config: &crate::config::Config) -> String {
-    if let Some(url) = &config.public_base_url {
-        return url.clone();
-    }
-
-    let proto = headers
-        .get("x-forwarded-proto")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("http");
-
-    let default_host = format!("localhost:{}", config.port);
-    let host = headers
-        .get("x-forwarded-host")
-        .or_else(|| headers.get(header::HOST))
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or(&default_host);
-
-    format!("{}://{}{}", proto, host, config.base_path)
+    Ok((
+        [(header::CONTENT_TYPE, "application/rss+xml; charset=utf-8")],
+        xml,
+    ))
 }
 
 fn escape_xml(s: &str) -> String {
@@ -107,13 +63,7 @@ fn escape_xml(s: &str) -> String {
         .replace('\'', "&apos;")
 }
 
-/// The page a reader should jump to: first unread page, clamped to the last
-/// existing page. Shared with the /api/news JSON Feed (routes::news).
-pub(super) fn next_page(read: i64, page: i64) -> i64 {
-    (read + 1).min(page.max(1))
-}
-
-fn build_item_xml(item: &FeedItem, base: &str) -> String {
+fn build_item_xml(item: &FavoriteUpdate, base: &str) -> String {
     let next_page = next_page(item.read, item.page);
     let link = format!("{}/novel/{}/{}/{}", base, item.type_str, item.id, next_page);
     let mut xml = String::from("<item>\n");
@@ -156,7 +106,7 @@ mod tests {
 
     #[test]
     fn build_item_xml_basic() {
-        let item = FeedItem {
+        let item = FavoriteUpdate {
             type_str: "narou".into(),
             id: "n1234ab".into(),
             title: "Test Novel".into(),
@@ -166,8 +116,10 @@ mod tests {
         };
         let xml = build_item_xml(&item, "http://localhost:3000");
         assert!(xml.contains("<title>Test Novel</title>"));
-        assert!(xml.contains("<link>http://localhost:3000/novel/narou/n1234ab/99</link>"),
-            "read=98, page=100 should link to 99");
+        assert!(
+            xml.contains("<link>http://localhost:3000/novel/narou/n1234ab/99</link>"),
+            "read=98, page=100 should link to 99"
+        );
         assert!(xml.contains("<description>100話 / 既読98話</description>"));
         assert!(xml.contains("<pubDate>2026-03-14T00:00:00</pubDate>"));
         assert!(xml.contains("<guid>http://localhost:3000/narou/n1234ab</guid>"));
@@ -175,7 +127,7 @@ mod tests {
 
     #[test]
     fn build_item_xml_without_updated_at() {
-        let item = FeedItem {
+        let item = FavoriteUpdate {
             type_str: "kakuyomu".into(),
             id: "abc".into(),
             title: "Novel".into(),
@@ -187,67 +139,9 @@ mod tests {
         assert!(!xml.contains("<pubDate>"));
     }
 
-    fn test_config(base_path: &str) -> crate::config::Config {
-        crate::config::Config {
-            port: 3000,
-            base_path: base_path.to_string(),
-            public_base_url: None,
-            db_path: String::new(),
-        }
-    }
-
-    #[test]
-    fn resolve_base_url_direct_access() {
-        let mut headers = HeaderMap::new();
-        headers.insert(header::HOST, "localhost:3000".parse().unwrap());
-        let config = test_config("");
-        assert_eq!(resolve_base_url(&headers, &config), "http://localhost:3000");
-    }
-
-    #[test]
-    fn resolve_base_url_reverse_proxy() {
-        let mut headers = HeaderMap::new();
-        headers.insert("x-forwarded-proto", "https".parse().unwrap());
-        headers.insert("x-forwarded-host", "novels.example.com".parse().unwrap());
-        let config = test_config("");
-        assert_eq!(
-            resolve_base_url(&headers, &config),
-            "https://novels.example.com"
-        );
-    }
-
-    #[test]
-    fn resolve_base_url_with_base_path() {
-        let mut headers = HeaderMap::new();
-        headers.insert("x-forwarded-proto", "https".parse().unwrap());
-        headers.insert("x-forwarded-host", "example.com".parse().unwrap());
-        let config = test_config("/novels");
-        assert_eq!(
-            resolve_base_url(&headers, &config),
-            "https://example.com/novels"
-        );
-    }
-
-    #[test]
-    fn resolve_base_url_no_headers() {
-        let headers = HeaderMap::new();
-        let config = test_config("");
-        assert_eq!(resolve_base_url(&headers, &config), "http://localhost:3000");
-    }
-
-    #[test]
-    fn resolve_base_url_prefers_configured_public_url() {
-        let mut headers = HeaderMap::new();
-        headers.insert(header::HOST, "novel:3000".parse().unwrap());
-        let mut config = test_config("");
-        config.public_base_url = Some("https://novel.sis.jp".to_string());
-
-        assert_eq!(resolve_base_url(&headers, &config), "https://novel.sis.jp");
-    }
-
     #[test]
     fn build_item_xml_links_to_next_page() {
-        let item = FeedItem {
+        let item = FavoriteUpdate {
             type_str: "narou".into(),
             id: "n1".into(),
             title: "Novel".into(),
@@ -258,7 +152,7 @@ mod tests {
         let xml = build_item_xml(&item, "http://localhost:3000");
         assert!(xml.contains("/n1/1</link>"), "read=0 should link to page 1");
 
-        let item2 = FeedItem {
+        let item2 = FavoriteUpdate {
             type_str: "narou".into(),
             id: "n2".into(),
             title: "Novel 2".into(),
@@ -267,12 +161,15 @@ mod tests {
             read: 5,
         };
         let xml2 = build_item_xml(&item2, "http://localhost:3000");
-        assert!(xml2.contains("/n2/6</link>"), "read=5 should link to page 6");
+        assert!(
+            xml2.contains("/n2/6</link>"),
+            "read=5 should link to page 6"
+        );
     }
 
     #[test]
     fn build_item_xml_clamps_to_max_page() {
-        let item = FeedItem {
+        let item = FavoriteUpdate {
             type_str: "narou".into(),
             id: "n1".into(),
             title: "Novel".into(),
@@ -281,13 +178,15 @@ mod tests {
             read: 100,
         };
         let xml = build_item_xml(&item, "http://localhost:3000");
-        assert!(xml.contains("/n1/100</link>"),
-            "read=100, page=100 should clamp to 100, not 101");
+        assert!(
+            xml.contains("/n1/100</link>"),
+            "read=100, page=100 should clamp to 100, not 101"
+        );
     }
 
     #[test]
     fn build_item_xml_escapes_title() {
-        let item = FeedItem {
+        let item = FavoriteUpdate {
             type_str: "narou".into(),
             id: "n1".into(),
             title: "Title <with> & \"special\" chars".into(),

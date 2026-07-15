@@ -1,6 +1,7 @@
 <script>
 	import config from '$lib/config.js';
 	import fetcher from '$lib/fetcher.js';
+	import { addFavorite as addFavoriteRequest, removeFavorite as removeFavoriteRequest } from '$lib/favorites.js';
 	import { navigate } from '$lib/router.svelte.js';
 	import { decodeHtml } from '$lib/decode.js';
 	import ConfirmModal from '$lib/components/ConfirmModal.svelte';
@@ -102,11 +103,7 @@
 		if (favSaving) return;
 		favSaving = true;
 		try {
-			await fetcher(`${config.path.api}/favorites/${params.type}/${params.id}`, {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ title, page: totalPages }),
-			});
+			await addFavoriteRequest(params.type, params.id, { title, page: totalPages });
 			isFav = true;
 		} catch (err) {
 			alert(err.message);
@@ -120,7 +117,7 @@
 		if (favSaving) return;
 		favSaving = true;
 		try {
-			await fetcher(`${config.path.api}/favorites/${params.type}/${params.id}`, { method: 'DELETE' });
+			await removeFavoriteRequest(params.type, params.id);
 			isFav = false;
 		} catch (err) {
 			alert(err.message);

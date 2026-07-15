@@ -66,7 +66,8 @@ mod tests {
 
     #[test]
     fn preserves_inline_formatting_tags() {
-        let html = "<em>e</em><strong>s</strong><b>b</b><i>i</i><u>u</u><s>s</s><sub>1</sub><sup>2</sup>";
+        let html =
+            "<em>e</em><strong>s</strong><b>b</b><i>i</i><u>u</u><s>s</s><sub>1</sub><sup>2</sup>";
         let out = clean(html);
         for tag in ["em", "strong", "b", "i", "u", "s", "sub", "sup"] {
             assert!(out.contains(&format!("<{tag}>")), "missing {tag}");

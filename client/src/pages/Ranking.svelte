@@ -1,6 +1,7 @@
 <script>
 	import config from '$lib/config.js';
 	import fetcher from '$lib/fetcher.js';
+	import { addFavorite as addFavoriteRequest, removeFavorite as removeFavoriteRequest } from '$lib/favorites.js';
 	import { link } from '$lib/router.svelte.js';
 	import NovelDetailModal from '$lib/components/NovelDetailModal.svelte';
 	import ConfirmModal from '$lib/components/ConfirmModal.svelte';
@@ -121,11 +122,7 @@
 
 	async function addFavorite(novel) {
 		try {
-			await fetcher(`${config.path.api}/favorites/${type}/${novel.id}`, {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ title: novel.title, page: novel.page }),
-			});
+			await addFavoriteRequest(type, novel.id, novel);
 			updateFavIds(novel.id);
 		} catch (err) {
 			alert(err.message);
@@ -134,7 +131,7 @@
 
 	async function removeFavorite(novel) {
 		try {
-			await fetcher(`${config.path.api}/favorites/${type}/${novel.id}`, { method: 'DELETE' });
+			await removeFavoriteRequest(type, novel.id);
 			updateFavIds(novel.id);
 		} catch (err) {
 			alert(err.message);

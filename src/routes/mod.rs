@@ -1,6 +1,7 @@
 mod auth;
 mod detail;
 mod favorites;
+mod feed;
 mod news;
 mod pages;
 mod ranking;

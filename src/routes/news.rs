@@ -1,4 +1,4 @@
-use super::rss::{next_page, resolve_base_url};
+use super::feed::{load_favorite_updates, next_page, resolve_base_url, FavoriteUpdate};
 use crate::auth::UserId;
 use crate::error::AppError;
 use crate::state::AppState;
@@ -11,15 +11,6 @@ use serde_json::json;
 
 pub fn routes() -> Router<AppState> {
     Router::new().route("/api/news", get(get_news))
-}
-
-struct NewsItem {
-    type_str: String,
-    id: String,
-    title: String,
-    novelupdated_at: Option<String>,
-    page: i64,
-    read: i64,
 }
 
 #[utoipa::path(
@@ -38,25 +29,7 @@ async fn get_news(
     Extension(user_id): Extension<UserId>,
     headers: HeaderMap,
 ) -> Result<impl IntoResponse, AppError> {
-    let items = {
-        let db = state.db.lock().unwrap();
-        let mut stmt = db.prepare(
-            "SELECT type, id, title, novelupdated_at, page, read FROM favorites
-             WHERE user_id = ?1 AND page - read > 0 AND page - read < 10
-             ORDER BY novelupdated_at DESC NULLS LAST",
-        )?;
-        let rows = stmt.query_map([user_id.0], |row| {
-            Ok(NewsItem {
-                type_str: row.get(0)?,
-                id: row.get(1)?,
-                title: row.get(2)?,
-                novelupdated_at: row.get(3)?,
-                page: row.get(4)?,
-                read: row.get(5)?,
-            })
-        })?;
-        rows.collect::<Result<Vec<_>, _>>()?
-    };
+    let items = load_favorite_updates(&state.db.lock().unwrap(), user_id.0)?;
 
     let base = resolve_base_url(&headers, &state.config);
     let feed = build_json_feed(&items, &base);
@@ -67,7 +40,7 @@ async fn get_news(
     ))
 }
 
-fn build_json_feed(items: &[NewsItem], base: &str) -> serde_json::Value {
+fn build_json_feed(items: &[FavoriteUpdate], base: &str) -> serde_json::Value {
     json!({
         "version": "https://jsonfeed.org/version/1.1",
         "title": "Novel Server - お気に入り更新",
@@ -76,7 +49,7 @@ fn build_json_feed(items: &[NewsItem], base: &str) -> serde_json::Value {
     })
 }
 
-fn build_item(item: &NewsItem, base: &str) -> serde_json::Value {
+fn build_item(item: &FavoriteUpdate, base: &str) -> serde_json::Value {
     let unread = item.page - item.read;
     let mut obj = json!({
         "id": format!("{}/{}", item.type_str, item.id),

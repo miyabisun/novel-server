@@ -1,8 +1,8 @@
 use crate::auth::UserId;
 use crate::state::AppState;
 use axum::extract::State;
-use axum::Extension;
 use axum::routing::get;
+use axum::Extension;
 use axum::{Json, Router};
 use serde_json::{json, Value};
 
@@ -27,9 +27,11 @@ async fn get_me(
 ) -> Json<Value> {
     let email = {
         let db = state.db.lock().unwrap();
-        db.query_row("SELECT email FROM users WHERE id = ?1", [user_id.0], |row| {
-            row.get::<_, String>(0)
-        })
+        db.query_row(
+            "SELECT email FROM users WHERE id = ?1",
+            [user_id.0],
+            |row| row.get::<_, String>(0),
+        )
         .unwrap_or_else(|_| "guest".to_string())
     };
     Json(json!({ "email": email }))

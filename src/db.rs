@@ -164,5 +164,4 @@ mod tests {
             .unwrap();
         assert!(index_exists);
     }
-
 }

@@ -1,6 +1,7 @@
 <script>
 	import config from '$lib/config.js';
 	import fetcher from '$lib/fetcher.js';
+	import { addFavorite, removeFavorite } from '$lib/favorites.js';
 	import { navigate } from '$lib/router.svelte.js';
 	import { decodeHtml } from '$lib/decode.js';
 	import Icon from '$lib/components/Icon.svelte';
@@ -50,13 +51,9 @@
 		saving = true;
 		try {
 			if (isFav) {
-				await fetcher(`${config.path.api}/favorites/${type}/${novel.id}`, { method: 'DELETE' });
+				await removeFavorite(type, novel.id);
 			} else {
-				await fetcher(`${config.path.api}/favorites/${type}/${novel.id}`, {
-					method: 'PUT',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ title: novel.title, page: novel.page }),
-				});
+				await addFavorite(type, novel.id, novel);
 			}
 			onToggleFav?.(novel.id);
 		} catch (err) {

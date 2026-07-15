@@ -85,5 +85,9 @@ async fn fetch_and_cache(
     let label = format!("fetchPage {}/{}/{}", id, num, key);
     let raw = super::with_retry(&label, || module.fetch_page(&state.http, id, num)).await?;
     let html = sanitize::clean(raw.as_deref().unwrap_or(""));
-    Ok(Json(state.cache.set(key, json!({ "html": html }), Some(PAGE_TTL))))
+    Ok(Json(state.cache.set(
+        key,
+        json!({ "html": html }),
+        Some(PAGE_TTL),
+    )))
 }

@@ -371,7 +371,10 @@ mod tests {
         let work = extract_work(&apollo, "abc").unwrap();
         assert_eq!(work.title, "My Novel");
         assert_eq!(work.story, "A great story");
-        assert_eq!(work.novelupdated_at, Some("2025-01-15 10:30:00".to_string()));
+        assert_eq!(
+            work.novelupdated_at,
+            Some("2025-01-15 10:30:00".to_string())
+        );
     }
 
     #[test]
