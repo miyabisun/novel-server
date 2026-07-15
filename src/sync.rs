@@ -5,6 +5,8 @@ use serde_json::Value;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+const KAKUYOMU_CYCLE: Duration = Duration::from_secs(60 * 60);
+
 /// Refresh a favorite's metadata from a fetched datum. Shared by the periodic
 /// sync and the fire-and-forget fetch on registration so the two never diverge.
 ///
@@ -47,13 +49,14 @@ pub fn start_sync(state: AppState) {
 
 fn get_ids(db: &Arc<Mutex<Connection>>, type_str: &str) -> Vec<String> {
     let conn = db.lock().unwrap();
-    let mut stmt = match conn.prepare("SELECT DISTINCT id FROM favorites WHERE type = ?1") {
-        Ok(s) => s,
-        Err(e) => {
-            tracing::error!("[sync] {} db error: {}", type_str, e);
-            return Vec::new();
-        }
-    };
+    let mut stmt =
+        match conn.prepare("SELECT DISTINCT id FROM favorites WHERE type = ?1 ORDER BY id") {
+            Ok(s) => s,
+            Err(e) => {
+                tracing::error!("[sync] {} db error: {}", type_str, e);
+                return Vec::new();
+            }
+        };
     let result = match stmt.query_map(rusqlite::params![type_str], |row| row.get::<_, String>(0)) {
         Ok(rows) => rows.filter_map(|r| r.ok()).collect(),
         Err(e) => {
@@ -142,11 +145,39 @@ async fn sync_syosetu(state: &AppState, module: &ModuleType, type_str: &str) {
     }
 }
 
+struct KakuyomuCycle {
+    ids: std::vec::IntoIter<String>,
+    count: usize,
+    index: usize,
+}
+
+impl KakuyomuCycle {
+    fn new(ids: Vec<String>) -> Self {
+        let count = ids.len();
+        Self {
+            ids: ids.into_iter(),
+            count,
+            index: 0,
+        }
+    }
+}
+
+impl Iterator for KakuyomuCycle {
+    type Item = (usize, String, Duration);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let id = self.ids.next()?;
+        let index = self.index;
+        self.index += 1;
+        let offset_ms = KAKUYOMU_CYCLE.as_millis() * index as u128 / self.count as u128;
+        Some((index, id, Duration::from_millis(offset_ms as u64)))
+    }
+}
+
 fn start_kakuyomu_sync(state: AppState) {
     tokio::spawn(async move {
         let module = ModuleType::Kakuyomu;
         let type_str = "kakuyomu";
-        let mut index: usize = 0;
 
         loop {
             let ids = get_ids(&state.db, type_str);
@@ -156,22 +187,28 @@ fn start_kakuyomu_sync(state: AppState) {
                 continue;
             }
 
-            index %= count;
-            let id = ids[index].clone();
+            let cycle_started = tokio::time::Instant::now();
+            for (index, id, offset) in KakuyomuCycle::new(ids) {
+                tokio::time::sleep_until(cycle_started + offset).await;
 
-            match module.fetch_datum(&state.http, &id).await {
-                Ok(datum) => {
-                    update_favorite_from_datum(&state.db, type_str, &datum);
-                    tracing::info!("[sync] kakuyomu: updated {} ({}/{})", id, index + 1, count);
-                    index += 1;
-                    let interval_ms = 3_600_000u64 / count as u64;
-                    tokio::time::sleep(Duration::from_millis(interval_ms)).await;
-                }
-                Err(e) => {
-                    tracing::error!("[sync] kakuyomu error: {}", e);
-                    tokio::time::sleep(Duration::from_secs(60)).await;
+                match module.fetch_datum(&state.http, &id).await {
+                    Ok(datum) => {
+                        update_favorite_from_datum(&state.db, type_str, &datum);
+                        tracing::info!("[sync] kakuyomu: updated {} ({}/{})", id, index + 1, count);
+                    }
+                    Err(e) => {
+                        tracing::error!(
+                            "[sync] kakuyomu: failed {} ({}/{}): {}",
+                            id,
+                            index + 1,
+                            count,
+                            e
+                        );
+                    }
                 }
             }
+
+            tokio::time::sleep_until(cycle_started + KAKUYOMU_CYCLE).await;
         }
     });
 }
@@ -268,5 +305,61 @@ mod tests {
         let (title, ts) = stored(&db);
         assert_eq!(title, "New Title");
         assert_eq!(ts.as_deref(), Some("2024-01-01 00:00:00"));
+    }
+
+    #[test]
+    fn kakuyomu_cycle_has_fixed_cadence_and_advances_after_failure() {
+        let ids = (1..=18).map(|n| format!("work-{n}")).collect();
+        let mut cycle = KakuyomuCycle::new(ids);
+
+        let first = cycle.next().unwrap();
+        assert_eq!(
+            (first.0, first.1.as_str(), first.2),
+            (0, "work-1", Duration::ZERO)
+        );
+
+        // A failed fetch does not affect the iterator: the following slot is a
+        // different ID at the fixed cycle-relative deadline.
+        let second = cycle.next().unwrap();
+        assert_eq!(second.0, 1);
+        assert_eq!(second.1, "work-2");
+        assert_eq!(second.2, Duration::from_secs(200));
+
+        let last = cycle.last().unwrap();
+        assert_eq!(last.0, 17);
+        assert_eq!(last.1, "work-18");
+        assert_eq!(last.2, Duration::from_secs(3_400));
+    }
+
+    #[test]
+    fn sync_ids_are_distinct_and_stably_ordered() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(crate::db::SCHEMA).unwrap();
+        conn.execute("INSERT INTO users (id, email) VALUES (2, 'second')", [])
+            .unwrap();
+        for (user_id, id) in [(1, "z-work"), (1, "a-work"), (2, "a-work")] {
+            conn.execute(
+                "INSERT INTO favorites (user_id, type, id, title, page)
+                 VALUES (?1, 'kakuyomu', ?2, 'Novel', 1)",
+                rusqlite::params![user_id, id],
+            )
+            .unwrap();
+        }
+        let db = Arc::new(Mutex::new(conn));
+
+        assert_eq!(get_ids(&db, "kakuyomu"), ["a-work", "z-work"]);
+    }
+
+    #[test]
+    fn kakuyomu_cycle_keeps_its_snapshot_when_favorites_change() {
+        let mut favorites = vec!["a-work".to_string(), "b-work".to_string()];
+        let cycle = KakuyomuCycle::new(favorites.clone());
+
+        favorites.remove(0);
+        favorites.push("c-work".to_string());
+        let current_ids: Vec<_> = cycle.map(|(_, id, _)| id).collect();
+
+        assert_eq!(current_ids, ["a-work", "b-work"]);
+        assert_eq!(favorites, ["b-work", "c-work"]);
     }
 }

@@ -14,6 +14,9 @@ mod sync;
 use config::Config;
 use state::AppState;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
+
+const UPSTREAM_TIMEOUT: Duration = Duration::from_secs(30);
 
 #[tokio::main]
 async fn main() {
@@ -26,6 +29,7 @@ async fn main() {
     let cache = Arc::new(cache::Cache::new());
     let http = reqwest::Client::builder()
         .user_agent("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+        .timeout(UPSTREAM_TIMEOUT)
         .build()
         .expect("Failed to build HTTP client");
 

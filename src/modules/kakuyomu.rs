@@ -1,5 +1,5 @@
 use crate::error::AppError;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, FixedOffset, Utc};
 use scraper::{Html, Selector};
 use serde_json::{json, Map, Value};
 
@@ -44,9 +44,12 @@ fn extract_work(apollo: &Value, id: &str) -> Result<WorkInfo, AppError> {
         .unwrap_or_default()
         .to_string();
     let novelupdated_at = work["lastEpisodePublishedAt"].as_str().and_then(|s| {
-        s.parse::<DateTime<Utc>>()
-            .ok()
-            .map(|dt| dt.format("%Y-%m-%d %H:%M:%S").to_string())
+        s.parse::<DateTime<Utc>>().ok().map(|dt| {
+            let jst = FixedOffset::east_opt(9 * 60 * 60).expect("valid JST offset");
+            dt.with_timezone(&jst)
+                .format("%Y-%m-%d %H:%M:%S")
+                .to_string()
+        })
     });
 
     Ok(WorkInfo {
@@ -373,7 +376,7 @@ mod tests {
         assert_eq!(work.story, "A great story");
         assert_eq!(
             work.novelupdated_at,
-            Some("2025-01-15 10:30:00".to_string())
+            Some("2025-01-15 19:30:00".to_string())
         );
     }
 
