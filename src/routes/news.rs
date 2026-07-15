@@ -152,6 +152,7 @@ mod tests {
             config: Config {
                 port: 3000,
                 base_path: String::new(),
+                public_base_url: None,
                 db_path: String::new(),
             },
             http: reqwest::Client::new(),
@@ -362,6 +363,21 @@ mod tests {
         assert_eq!(item["_news"]["total"], 100);
         assert_eq!(item["_news"]["read"], 98);
         assert_eq!(item["_news"]["unread"], 2);
+    }
+
+    #[tokio::test]
+    async fn news_uses_configured_public_url_for_links() {
+        let mut state = test_state();
+        state.config.public_base_url = Some("https://novel.sis.jp".to_string());
+        insert_favorite(&state, 1, "narou", "n1234ab", None, 10, 9);
+
+        let (_, feed) = get_news_feed(&state, 1).await;
+
+        assert_eq!(feed["home_page_url"], "https://novel.sis.jp");
+        assert_eq!(
+            feed["items"][0]["url"],
+            "https://novel.sis.jp/novel/narou/n1234ab/10"
+        );
     }
 
     #[tokio::test]

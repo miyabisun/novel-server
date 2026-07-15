@@ -80,6 +80,10 @@ async fn get_rss(
 /// Derive the base URL from request headers (reverse proxy or direct access).
 /// Shared with the /api/news JSON Feed (routes::news).
 pub(super) fn resolve_base_url(headers: &HeaderMap, config: &crate::config::Config) -> String {
+    if let Some(url) = &config.public_base_url {
+        return url.clone();
+    }
+
     let proto = headers
         .get("x-forwarded-proto")
         .and_then(|v| v.to_str().ok())
@@ -187,6 +191,7 @@ mod tests {
         crate::config::Config {
             port: 3000,
             base_path: base_path.to_string(),
+            public_base_url: None,
             db_path: String::new(),
         }
     }
@@ -228,6 +233,16 @@ mod tests {
         let headers = HeaderMap::new();
         let config = test_config("");
         assert_eq!(resolve_base_url(&headers, &config), "http://localhost:3000");
+    }
+
+    #[test]
+    fn resolve_base_url_prefers_configured_public_url() {
+        let mut headers = HeaderMap::new();
+        headers.insert(header::HOST, "novel:3000".parse().unwrap());
+        let mut config = test_config("");
+        config.public_base_url = Some("https://novel.sis.jp".to_string());
+
+        assert_eq!(resolve_base_url(&headers, &config), "https://novel.sis.jp");
     }
 
     #[test]
