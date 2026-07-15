@@ -9,11 +9,14 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 
 fn map_favorite_row(row: &rusqlite::Row) -> rusqlite::Result<Value> {
+    let novelupdated_at = row
+        .get::<_, Option<i64>>(3)?
+        .and_then(crate::time::unix_timestamp_to_rfc3339);
     Ok(json!({
         "type": row.get::<_, String>(0)?,
         "id": row.get::<_, String>(1)?,
         "title": row.get::<_, String>(2)?,
-        "novelupdated_at": row.get::<_, Option<String>>(3)?,
+        "novelupdated_at": novelupdated_at,
         "page": row.get::<_, i64>(4)?,
         "read": row.get::<_, i64>(5)?,
     }))
@@ -60,7 +63,7 @@ struct ProgressBody {
     description = "お気に入りに登録された小説の一覧を取得する。小説更新日時の降順でソートされる（更新日時のないものは末尾）。キャッシュなし。",
     responses(
         (status = 200, description = "お気に入り一覧", body = Vec<crate::openapi::Favorite>,
-            example = json!([{"type": "narou", "id": "n1234ab", "title": "小説タイトル", "novelupdated_at": "2026-02-15T00:00:00", "page": 150, "read": 42}])),
+            example = json!([{"type": "narou", "id": "n1234ab", "title": "小説タイトル", "novelupdated_at": "2026-02-15T00:00:00Z", "page": 150, "read": 42}])),
         (status = 500, description = "DBエラー", body = crate::openapi::ErrorResponse),
     ),
 )]
@@ -93,7 +96,7 @@ async fn get_favorites(
         ("id" = String, Path, description = "小説ID", example = "n1234ab"),
     ),
     request_body(content = crate::openapi::FavoriteRequest, description = "お気に入り情報。novelupdated_atは省略可",
-        example = json!({"title": "小説タイトル", "page": 150, "novelupdated_at": "2026-02-15T00:00:00"})),
+        example = json!({"title": "小説タイトル", "page": 150, "novelupdated_at": "2026-02-15T09:00:00+09:00"})),
     responses(
         (status = 200, description = "作成/更新されたお気に入り", body = crate::openapi::Favorite),
         (status = 400, description = "必須フィールド不足", body = crate::openapi::ErrorResponse,
@@ -114,7 +117,12 @@ async fn put_favorite(
     let page = body
         .page
         .ok_or_else(|| AppError::BadRequest("title and page are required".into()))?;
-    let novelupdated_at = body.novelupdated_at;
+    let novelupdated_at = match body.novelupdated_at.as_deref() {
+        Some(value) => Some(crate::time::parse_upstream_timestamp(value).ok_or_else(|| {
+            AppError::BadRequest("novelupdated_at must be RFC3339 or a JST date-time".into())
+        })?),
+        None => None,
+    };
 
     let favorite = {
         let db = state.db.lock().unwrap();

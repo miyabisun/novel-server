@@ -17,9 +17,9 @@ const KAKUYOMU_CYCLE: Duration = Duration::from_secs(60 * 60);
 /// reflects the real publication time rather than a crawl-time approximation, so
 /// even long-stale novels get a correct, non-NULL sort key.
 ///
-/// The WHERE clause writes only when an API value actually differs from the
-/// stored one (null-safe `IS NOT`), so re-running against unchanged novels is a
-/// no-op and the periodic sync's "changed" count stays meaningful.
+/// The WHERE clause also replaces any non-integer legacy value. This lets each
+/// periodic source sync repair old timestamp strings without guessing whether
+/// those ambiguous values represented UTC or JST.
 ///
 /// Params: ?1 = title, ?2 = page, ?3 = novelupdated_at, ?4 = type, ?5 = id.
 const REFRESH_FAVORITE_SQL: &str = "UPDATE favorites SET
@@ -29,7 +29,8 @@ const REFRESH_FAVORITE_SQL: &str = "UPDATE favorites SET
      WHERE type = ?4 AND id = ?5
        AND ((?1 IS NOT NULL AND ?1 IS NOT title)
             OR (?2 IS NOT NULL AND ?2 IS NOT page)
-            OR (?3 IS NOT NULL AND ?3 IS NOT novelupdated_at))";
+            OR (?3 IS NOT NULL AND
+                (typeof(novelupdated_at) != 'integer' OR ?3 IS NOT novelupdated_at)))";
 
 /// Periodically sync favorite metadata in the background.
 ///
@@ -75,7 +76,9 @@ fn refresh_favorite(conn: &Connection, type_str: &str, datum: &Value) -> usize {
     let id = datum["id"].as_str().unwrap_or_default();
     let title = datum["title"].as_str();
     let new_page = datum["pages"].as_array().map(|a| a.len() as i64);
-    let novelupdated_at = datum["novelupdated_at"].as_str();
+    let novelupdated_at = datum["novelupdated_at"]
+        .as_str()
+        .and_then(crate::time::parse_upstream_timestamp);
 
     if title.is_none() && new_page.is_none() && novelupdated_at.is_none() {
         return 0;
@@ -219,7 +222,7 @@ mod tests {
     use serde_json::json;
 
     fn db_with_favorite(
-        novelupdated_at: Option<&str>,
+        novelupdated_at: Option<rusqlite::types::Value>,
         page: i64,
         title: &str,
     ) -> Arc<Mutex<Connection>> {
@@ -238,7 +241,7 @@ mod tests {
         Value::Array((0..n).map(|_| json!({})).collect())
     }
 
-    fn stored(db: &Arc<Mutex<Connection>>) -> (String, Option<String>) {
+    fn stored(db: &Arc<Mutex<Connection>>) -> (String, Option<i64>) {
         db.lock()
             .unwrap()
             .query_row(
@@ -271,40 +274,71 @@ mod tests {
             "narou",
             &datum("Stale Novel", 3, Some("2024-03-15 10:00:00")),
         );
-        assert_eq!(stored(&db).1.as_deref(), Some("2024-03-15 10:00:00"));
+        assert_eq!(stored(&db).1, Some(1_710_464_400));
     }
 
     #[test]
     fn overwrites_existing_value_with_api_general_lastup() {
         // A row previously stamped with a (now-removed) crawl time is corrected to
         // the real publication time on the next sync.
-        let db = db_with_favorite(Some("2026-05-20 10:00:00"), 3, "Novel");
+        let db = db_with_favorite(
+            Some(rusqlite::types::Value::Integer(1_769_000_000)),
+            3,
+            "Novel",
+        );
         update_favorite_from_datum(
             &db,
             "narou",
             &datum("Novel", 3, Some("2026-05-20 09:55:00")),
         );
-        assert_eq!(stored(&db).1.as_deref(), Some("2026-05-20 09:55:00"));
+        assert_eq!(stored(&db).1, Some(1_779_238_500));
     }
 
     #[test]
     fn keeps_existing_when_datum_has_no_novelupdated_at() {
         // kakuyomu omits the timestamp when lastEpisodePublishedAt is missing;
         // COALESCE must not clobber an existing value with NULL.
-        let db = db_with_favorite(Some("2024-01-01 00:00:00"), 3, "Novel");
+        let db = db_with_favorite(
+            Some(rusqlite::types::Value::Integer(1_704_067_200)),
+            3,
+            "Novel",
+        );
         update_favorite_from_datum(&db, "narou", &datum("Novel", 3, None));
-        assert_eq!(stored(&db).1.as_deref(), Some("2024-01-01 00:00:00"));
+        assert_eq!(stored(&db).1, Some(1_704_067_200));
     }
 
     #[test]
     fn refreshes_title_while_preserving_timestamp() {
         // A title change triggers the UPDATE, but a datum without novelupdated_at
         // must leave the stored timestamp untouched (independent COALESCE columns).
-        let db = db_with_favorite(Some("2024-01-01 00:00:00"), 3, "Old Title");
+        let db = db_with_favorite(
+            Some(rusqlite::types::Value::Integer(1_704_067_200)),
+            3,
+            "Old Title",
+        );
         update_favorite_from_datum(&db, "narou", &datum("New Title", 3, None));
         let (title, ts) = stored(&db);
         assert_eq!(title, "New Title");
-        assert_eq!(ts.as_deref(), Some("2024-01-01 00:00:00"));
+        assert_eq!(ts, Some(1_704_067_200));
+    }
+
+    #[test]
+    fn periodic_refresh_replaces_non_integer_legacy_timestamp() {
+        let db = db_with_favorite(
+            Some(rusqlite::types::Value::Text(
+                "2026-05-20 09:55:00".to_string(),
+            )),
+            3,
+            "Novel",
+        );
+
+        update_favorite_from_datum(
+            &db,
+            "narou",
+            &datum("Novel", 3, Some("2026-05-20 09:55:00")),
+        );
+
+        assert_eq!(stored(&db).1, Some(1_779_238_500));
     }
 
     #[test]

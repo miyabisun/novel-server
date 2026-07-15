@@ -73,8 +73,11 @@ fn build_item_xml(item: &FavoriteUpdate, base: &str) -> String {
         "<description>{}話 / 既読{}話</description>\n",
         item.page, item.read
     ));
-    if let Some(ref dt) = item.novelupdated_at {
-        xml.push_str(&format!("<pubDate>{}</pubDate>\n", escape_xml(dt)));
+    if let Some(dt) = item
+        .novelupdated_at
+        .and_then(crate::time::unix_timestamp_to_rfc2822)
+    {
+        xml.push_str(&format!("<pubDate>{}</pubDate>\n", escape_xml(&dt)));
     }
     xml.push_str(&format!(
         "<guid>{}/{}/{}</guid>\n",
@@ -110,7 +113,7 @@ mod tests {
             type_str: "narou".into(),
             id: "n1234ab".into(),
             title: "Test Novel".into(),
-            novelupdated_at: Some("2026-03-14T00:00:00".into()),
+            novelupdated_at: Some(1_773_446_400),
             page: 100,
             read: 98,
         };
@@ -121,7 +124,7 @@ mod tests {
             "read=98, page=100 should link to 99"
         );
         assert!(xml.contains("<description>100話 / 既読98話</description>"));
-        assert!(xml.contains("<pubDate>2026-03-14T00:00:00</pubDate>"));
+        assert!(xml.contains("<pubDate>Sat, 14 Mar 2026 00:00:00 +0000</pubDate>"));
         assert!(xml.contains("<guid>http://localhost:3000/narou/n1234ab</guid>"));
     }
 

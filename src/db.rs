@@ -12,7 +12,7 @@ pub(crate) const SCHEMA: &str = "
         type TEXT NOT NULL,
         id TEXT NOT NULL,
         title TEXT NOT NULL,
-        novelupdated_at TEXT,
+        novelupdated_at INTEGER,
         page INTEGER NOT NULL,
         read INTEGER NOT NULL DEFAULT 0,
         PRIMARY KEY (user_id, type, id),
@@ -36,8 +36,55 @@ pub fn open(path: &str) -> Connection {
     .expect("Failed to set PRAGMA");
 
     conn.execute_batch(SCHEMA).expect("Failed to create tables");
+    migrate_favorite_timestamps(&conn).expect("Failed to migrate favorite timestamps");
 
     conn
+}
+
+fn migrate_favorite_timestamps(conn: &Connection) -> rusqlite::Result<()> {
+    let declared_type: String = conn.query_row(
+        "SELECT type FROM pragma_table_info('favorites') WHERE name = 'novelupdated_at'",
+        [],
+        |row| row.get(0),
+    )?;
+    if declared_type.eq_ignore_ascii_case("INTEGER") {
+        // SQLite's dynamic typing permits text in an INTEGER column. Never try
+        // to infer the timezone of such legacy values; the next source sync
+        // will repopulate them from authoritative upstream metadata.
+        conn.execute(
+            "UPDATE favorites SET novelupdated_at = NULL
+             WHERE novelupdated_at IS NOT NULL
+               AND typeof(novelupdated_at) != 'integer'",
+            [],
+        )?;
+        return Ok(());
+    }
+
+    let tx = conn.unchecked_transaction()?;
+    tx.execute_batch(
+        "DROP INDEX IF EXISTS idx_favorites_updated;
+         ALTER TABLE favorites RENAME TO favorites_legacy;
+         CREATE TABLE favorites (
+            user_id INTEGER NOT NULL DEFAULT 1,
+            type TEXT NOT NULL,
+            id TEXT NOT NULL,
+            title TEXT NOT NULL,
+            novelupdated_at INTEGER,
+            page INTEGER NOT NULL,
+            read INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (user_id, type, id),
+            FOREIGN KEY (user_id) REFERENCES users(id)
+         );
+         INSERT INTO favorites (user_id, type, id, title, novelupdated_at, page, read)
+         SELECT user_id, type, id, title,
+                CASE WHEN typeof(novelupdated_at) = 'integer' THEN novelupdated_at ELSE NULL END,
+                page, read
+         FROM favorites_legacy;
+         DROP TABLE favorites_legacy;
+         CREATE INDEX idx_favorites_updated
+            ON favorites (user_id, novelupdated_at DESC);",
+    )?;
+    tx.commit()
 }
 
 #[cfg(test)]
@@ -142,7 +189,7 @@ mod tests {
         )
         .unwrap();
 
-        let updated: Option<String> = conn
+        let updated: Option<i64> = conn
             .query_row(
                 "SELECT novelupdated_at FROM favorites WHERE user_id = 1 AND type = ?1 AND id = ?2",
                 ("narou", "n1"),
@@ -150,6 +197,35 @@ mod tests {
             )
             .unwrap();
         assert!(updated.is_none());
+    }
+
+    #[test]
+    fn migration_discards_ambiguous_text_timestamps_without_guessing() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(&SCHEMA.replace("novelupdated_at INTEGER", "novelupdated_at TEXT"))
+            .unwrap();
+        conn.execute(
+            "INSERT INTO favorites (type, id, title, novelupdated_at, page) VALUES ('narou', 'n1', 'Novel', '2026-03-14 09:00:00', 1)",
+            [],
+        )
+        .unwrap();
+
+        migrate_favorite_timestamps(&conn).unwrap();
+
+        let (declared_type, value): (String, Option<i64>) = (
+            conn.query_row(
+                "SELECT type FROM pragma_table_info('favorites') WHERE name = 'novelupdated_at'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap(),
+            conn.query_row("SELECT novelupdated_at FROM favorites", [], |row| {
+                row.get(0)
+            })
+            .unwrap(),
+        );
+        assert_eq!(declared_type, "INTEGER");
+        assert_eq!(value, None);
     }
 
     #[test]

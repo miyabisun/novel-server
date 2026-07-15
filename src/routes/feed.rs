@@ -6,7 +6,7 @@ pub(super) struct FavoriteUpdate {
     pub type_str: String,
     pub id: String,
     pub title: String,
-    pub novelupdated_at: Option<String>,
+    pub novelupdated_at: Option<i64>,
     pub page: i64,
     pub read: i64,
 }

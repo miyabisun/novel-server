@@ -10,6 +10,7 @@ mod sanitize;
 mod spa;
 mod state;
 mod sync;
+mod time;
 
 use config::Config;
 use state::AppState;

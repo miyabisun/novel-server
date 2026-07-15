@@ -70,29 +70,13 @@ fn build_item(item: &FavoriteUpdate, base: &str) -> serde_json::Value {
             "unread": unread,
         },
     });
-    if let Some(dt) = item.novelupdated_at.as_deref().and_then(to_rfc3339_jst) {
+    if let Some(dt) = item
+        .novelupdated_at
+        .and_then(crate::time::unix_timestamp_to_rfc3339)
+    {
         obj["date_published"] = json!(dt);
     }
     obj
-}
-
-/// Normalize `novelupdated_at` to RFC3339 as JSON Feed requires.
-/// Source sites (なろう/カクヨム) store naive JST timestamps like
-/// `2026-03-14T00:00:00`; tag them with +09:00. Values that already carry a
-/// timezone are passed through, anything unparseable is dropped (the item is
-/// then published without a date rather than with an invalid one).
-fn to_rfc3339_jst(s: &str) -> Option<String> {
-    use chrono::{DateTime, FixedOffset, NaiveDateTime};
-
-    let s = s.trim();
-    if let Ok(dt) = DateTime::parse_from_rfc3339(s) {
-        return Some(dt.to_rfc3339());
-    }
-    let naive = NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S")
-        .or_else(|_| NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S"))
-        .ok()?;
-    let jst = FixedOffset::east_opt(9 * 3600).expect("+09:00 is a valid offset");
-    Some(naive.and_local_timezone(jst).single()?.to_rfc3339())
 }
 
 #[cfg(test)]
@@ -104,8 +88,7 @@ mod tests {
     // - Only favorites with 1-9 unread pages (0 < page - read < 10)
     // - Sorted by novelupdated_at DESC NULLS LAST
     // - item.url points at the next unread page
-    // - date_published is RFC3339: naive JST timestamps get +09:00, absent or
-    //   malformed timestamps omit the field entirely
+    // - date_published is RFC3339 UTC converted from the stored Unix timestamp
     //
     // Handler tests drive the real `get_news` over HTTP (oneshot) against an
     // in-memory DB so the SQL and user scoping are what is under test.
@@ -137,7 +120,7 @@ mod tests {
         user_id: i64,
         type_str: &str,
         id: &str,
-        updated_at: Option<&str>,
+        updated_at: Option<i64>,
         page: i64,
         read: i64,
     ) {
@@ -207,33 +190,9 @@ mod tests {
     async fn news_includes_only_favorites_with_1_to_9_unread() {
         let state = test_state();
         // 0 unread → excluded; 1-9 unread → included; 10+ unread → excluded
-        insert_favorite(
-            &state,
-            1,
-            "narou",
-            "n_done",
-            Some("2026-03-14T00:00:00"),
-            10,
-            10,
-        );
-        insert_favorite(
-            &state,
-            1,
-            "narou",
-            "n_read",
-            Some("2026-03-13T00:00:00"),
-            10,
-            5,
-        );
-        insert_favorite(
-            &state,
-            1,
-            "narou",
-            "n_far",
-            Some("2026-03-12T00:00:00"),
-            30,
-            10,
-        );
+        insert_favorite(&state, 1, "narou", "n_done", Some(1_773_446_400), 10, 10);
+        insert_favorite(&state, 1, "narou", "n_read", Some(1_773_360_000), 10, 5);
+        insert_favorite(&state, 1, "narou", "n_far", Some(1_773_273_600), 30, 10);
 
         let (status, feed) = get_news_feed(&state, 1).await;
         assert_eq!(status, StatusCode::OK);
@@ -243,24 +202,8 @@ mod tests {
     #[tokio::test]
     async fn news_sorted_by_updated_desc_nulls_last() {
         let state = test_state();
-        insert_favorite(
-            &state,
-            1,
-            "narou",
-            "n_old",
-            Some("2026-03-01T00:00:00"),
-            10,
-            9,
-        );
-        insert_favorite(
-            &state,
-            1,
-            "narou",
-            "n_new",
-            Some("2026-03-14T00:00:00"),
-            10,
-            9,
-        );
+        insert_favorite(&state, 1, "narou", "n_old", Some(1_772_323_200), 10, 9);
+        insert_favorite(&state, 1, "narou", "n_new", Some(1_773_446_400), 10, 9);
         insert_favorite(&state, 1, "kakuyomu", "k_null", None, 10, 9);
 
         let (_, feed) = get_news_feed(&state, 1).await;
@@ -273,24 +216,8 @@ mod tests {
     #[tokio::test]
     async fn news_scopes_feed_to_the_authenticated_user() {
         let state = test_state();
-        insert_favorite(
-            &state,
-            1,
-            "narou",
-            "n_u1",
-            Some("2026-03-14T00:00:00"),
-            10,
-            9,
-        );
-        insert_favorite(
-            &state,
-            2,
-            "narou",
-            "n_u2",
-            Some("2026-03-14T00:00:00"),
-            10,
-            9,
-        );
+        insert_favorite(&state, 1, "narou", "n_u1", Some(1_773_446_400), 10, 9);
+        insert_favorite(&state, 2, "narou", "n_u2", Some(1_773_446_400), 10, 9);
 
         let (_, feed1) = get_news_feed(&state, 1).await;
         assert_eq!(item_ids(&feed1), vec!["narou/n_u1"]);
@@ -302,15 +229,7 @@ mod tests {
     #[tokio::test]
     async fn news_items_follow_json_feed_1_1_with_news_extension() {
         let state = test_state();
-        insert_favorite(
-            &state,
-            1,
-            "narou",
-            "n1234ab",
-            Some("2026-03-14T00:00:00"),
-            100,
-            98,
-        );
+        insert_favorite(&state, 1, "narou", "n1234ab", Some(1_773_446_400), 100, 98);
 
         let (_, feed) = get_news_feed(&state, 1).await;
         assert_eq!(feed["version"], "https://jsonfeed.org/version/1.1");
@@ -328,8 +247,8 @@ mod tests {
             "JSON Feed 1.1 requires content_text or content_html on every item"
         );
         assert_eq!(
-            item["date_published"], "2026-03-14T00:00:00+09:00",
-            "naive JST timestamp must be tagged with +09:00"
+            item["date_published"], "2026-03-14T00:00:00Z",
+            "stored Unix seconds must be exposed as RFC3339 UTC"
         );
         assert_eq!(item["_news"]["service"], "novel");
         assert_eq!(item["_news"]["type"], "narou");
@@ -363,55 +282,6 @@ mod tests {
         assert!(
             item.get("date_published").is_none(),
             "date_published must be omitted (not null) when unknown"
-        );
-    }
-
-    #[test]
-    fn rfc3339_jst_tags_naive_timestamps() {
-        assert_eq!(
-            to_rfc3339_jst("2026-03-14T00:00:00"),
-            Some("2026-03-14T00:00:00+09:00".to_string())
-        );
-        assert_eq!(
-            to_rfc3339_jst("2026-03-14 12:34:56"),
-            Some("2026-03-14T12:34:56+09:00".to_string()),
-            "space separator must be normalized to T"
-        );
-    }
-
-    #[test]
-    fn rfc3339_jst_passes_through_zoned_timestamps() {
-        assert_eq!(
-            to_rfc3339_jst("2026-03-14T00:00:00Z"),
-            Some("2026-03-14T00:00:00+00:00".to_string()),
-            "Z is normalized to +00:00, preserving the instant"
-        );
-        assert_eq!(
-            to_rfc3339_jst("2026-03-14T00:00:00+09:00"),
-            Some("2026-03-14T00:00:00+09:00".to_string())
-        );
-        assert_eq!(
-            to_rfc3339_jst("2026-03-14T00:00:00.123+09:00"),
-            Some("2026-03-14T00:00:00.123+09:00".to_string()),
-            "fractional seconds are valid RFC3339 and must survive"
-        );
-    }
-
-    #[test]
-    fn rfc3339_jst_rejects_malformed_input() {
-        assert_eq!(to_rfc3339_jst(""), None);
-        assert_eq!(to_rfc3339_jst("not a date"), None);
-        assert_eq!(to_rfc3339_jst("2026-03-14"), None);
-        assert_eq!(to_rfc3339_jst("2026-03-14T00:00:00junk"), None);
-        assert_eq!(
-            to_rfc3339_jst("2026-03-14T00:00:00+AB:CD"),
-            None,
-            "non-numeric offsets are not RFC3339"
-        );
-        assert_eq!(
-            to_rfc3339_jst("更新日２０２６年"),
-            None,
-            "multi-byte garbage must not panic on byte slicing"
         );
     }
 }

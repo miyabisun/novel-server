@@ -58,7 +58,7 @@ CREATE TABLE favorites (
     type TEXT NOT NULL,
     id TEXT NOT NULL,
     title TEXT NOT NULL,
-    novelupdated_at TEXT,
+    novelupdated_at INTEGER,
     page INTEGER NOT NULL,
     read INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (user_id, type, id),
@@ -82,7 +82,9 @@ INSERT INTO users (id, email) VALUES (2, '$EMAIL');
 
 -- 2. Migrate favorites to the specified user
 INSERT INTO favorites (user_id, type, id, title, novelupdated_at, page, read)
-SELECT 2, type, id, title, novelupdated_at, page, read
+SELECT 2, type, id, title,
+       CASE WHEN typeof(novelupdated_at) = 'integer' THEN novelupdated_at ELSE NULL END,
+       page, read
 FROM old.favorites;
 
 COMMIT;

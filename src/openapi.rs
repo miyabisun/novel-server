@@ -79,7 +79,7 @@ pub struct Favorite {
     pub id: String,
     /// 小説タイトル
     pub title: String,
-    /// 小説の更新日時（ISO 8601形式、nullable）
+    /// 小説の更新日時（RFC 3339 UTC形式、nullable）
     #[serde(skip_serializing_if = "Option::is_none")]
     pub novelupdated_at: Option<String>,
     /// 総ページ数
@@ -95,7 +95,7 @@ pub struct FavoriteRequest {
     pub title: String,
     /// 総ページ数
     pub page: i64,
-    /// 小説の更新日時（ISO 8601形式、省略可）
+    /// 小説の更新日時（RFC 3339またはJSTの日時、省略可）
     #[serde(skip_serializing_if = "Option::is_none")]
     pub novelupdated_at: Option<String>,
 }
