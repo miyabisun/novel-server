@@ -1,6 +1,7 @@
 <script>
 	import config from '$lib/config.js';
 	import fetcher from '$lib/fetcher.js';
+	import { startAutoReload } from '$lib/auto-reload.js';
 	import { removeFavorite as removeFavoriteRequest } from '$lib/favorites.js';
 	import { link } from '$lib/router.svelte.js';
 	import { decodeHtml } from '$lib/decode.js';
@@ -13,15 +14,18 @@
 	let error = $state(null);
 	let deleteTarget = $state(null);
 
-	async function loadFavorites() {
-		loading = true;
-		error = null;
+	async function loadFavorites({ background = false } = {}) {
+		if (!background) {
+			loading = true;
+			error = null;
+		}
 		try {
 			favorites = await fetcher(`${config.path.api}/favorites`);
+			error = null;
 		} catch (e) {
-			error = e.message;
+			if (!background) error = e.message;
 		} finally {
-			loading = false;
+			if (!background) loading = false;
 		}
 	}
 
@@ -65,6 +69,8 @@
 	}
 
 	loadFavorites();
+
+	$effect(() => startAutoReload(() => loadFavorites({ background: true })));
 </script>
 
 <div class="favorites">
