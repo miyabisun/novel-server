@@ -6,10 +6,12 @@ function favoriteUrl(type, id) {
 }
 
 export function addFavorite(type, id, favorite) {
+  const body = { title: favorite.title, page: favorite.page }
+  if (favorite.read != null) body.read = favorite.read
   return fetcher(favoriteUrl(type, id), {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ title: favorite.title, page: favorite.page }),
+    body: JSON.stringify(body),
   })
 }
 

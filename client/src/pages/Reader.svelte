@@ -103,7 +103,7 @@
 		if (favSaving) return;
 		favSaving = true;
 		try {
-			await addFavoriteRequest(params.type, params.id, { title, page: totalPages });
+			await addFavoriteRequest(params.type, params.id, { title, page: totalPages, read: currentNum });
 			isFav = true;
 		} catch (err) {
 			alert(err.message);

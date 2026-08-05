@@ -28,6 +28,18 @@ describe('favorite API', () => {
     })
   })
 
+  it('sends the current reading position when provided', async () => {
+    fetcher.mockResolvedValue({})
+
+    await addFavorite('narou', 'n1234ab', { title: 'Novel', page: 42, read: 3 })
+
+    expect(fetcher).toHaveBeenCalledWith('/base/api/favorites/narou/n1234ab', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: 'Novel', page: 42, read: 3 }),
+    })
+  })
+
   it('removes a favorite with the shared request contract', async () => {
     fetcher.mockResolvedValue({ ok: true })
 

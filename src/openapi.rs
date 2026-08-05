@@ -98,6 +98,9 @@ pub struct FavoriteRequest {
     /// 小説の更新日時（RFC 3339またはJSTの日時、省略可）
     #[serde(skip_serializing_if = "Option::is_none")]
     pub novelupdated_at: Option<String>,
+    /// 新規登録時の初期既読位置（省略時0。既存のお気に入りには適用されない）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub read: Option<i64>,
 }
 
 /// 既読位置更新リクエスト

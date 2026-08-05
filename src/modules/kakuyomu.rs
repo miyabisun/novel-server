@@ -96,6 +96,40 @@ fn extract_episodes(apollo: &Value, _id: &str) -> Vec<EpisodeInfo> {
     pages
 }
 
+/// Extract the ranked work list from a ranking page's Apollo state.
+/// Order comes from `ROOT_QUERY.rankedWorks(...).nodes`, which lists
+/// `Work:` refs in rank order (kakuyomu Next entries use other typenames).
+fn parse_ranking(apollo: &Value) -> Result<Vec<Value>, AppError> {
+    let root = apollo
+        .get("ROOT_QUERY")
+        .and_then(|r| r.as_object())
+        .ok_or_else(|| AppError::Upstream("ROOT_QUERY not found in kakuyomu ranking".into()))?;
+    let nodes = root
+        .iter()
+        .find(|(key, _)| key.starts_with("rankedWorks("))
+        .and_then(|(_, ranked)| ranked.get("nodes"))
+        .and_then(|n| n.as_array())
+        .ok_or_else(|| AppError::Upstream("rankedWorks not found in kakuyomu ranking".into()))?;
+
+    let mut result = Vec::new();
+    for node in nodes {
+        let ref_str = match node.get("__ref").and_then(|r| r.as_str()) {
+            Some(r) if r.starts_with("Work:") => r,
+            _ => continue,
+        };
+        let work = match apollo.get(ref_str) {
+            Some(w) => w,
+            None => continue,
+        };
+        result.push(json!({
+            "id": ref_str.strip_prefix("Work:").unwrap_or_default(),
+            "title": work["title"].as_str().unwrap_or_default(),
+            "page": work["publicEpisodeCount"].as_u64().unwrap_or(0),
+        }));
+    }
+    Ok(result)
+}
+
 pub async fn fetch_ranking(
     client: &reqwest::Client,
     genre: &str,
@@ -109,42 +143,8 @@ pub async fn fetch_ranking(
             res.status()
         )));
     }
-    let doc = Html::parse_document(&res.text().await?);
-    let work_sel = Selector::parse(".widget-work").unwrap();
-    let title_sel = Selector::parse(".bookWalker-work-title").unwrap();
-    let ep_count_sel = Selector::parse(".widget-workCard-episodeCount").unwrap();
-
-    let rank_sel = Selector::parse(".widget-work-rank").unwrap();
-
-    let mut result = Vec::new();
-    for elem in doc.select(&work_sel) {
-        // Skip kakuyomu Next entries (no .widget-work-rank)
-        if elem.select(&rank_sel).next().is_none() {
-            continue;
-        }
-
-        let title_el = elem.select(&title_sel).next();
-        let id = title_el
-            .and_then(|el| el.value().attr("href"))
-            .and_then(|href| href.rsplit('/').next())
-            .unwrap_or_default();
-        let title = title_el
-            .map(|el| el.text().collect::<String>())
-            .unwrap_or_default();
-        let page_text = elem
-            .select(&ep_count_sel)
-            .next()
-            .map(|el| el.text().collect::<String>())
-            .unwrap_or_default();
-        let page: u64 = page_text.replace("話", "").trim().parse().unwrap_or(0);
-
-        result.push(json!({
-            "id": id,
-            "title": title,
-            "page": page,
-        }));
-    }
-    Ok(result)
+    let apollo = parse_apollo_state(&res.text().await?)?;
+    parse_ranking(&apollo)
 }
 
 pub async fn fetch_ranking_list(client: &reqwest::Client, period: &str) -> Result<Value, AppError> {
@@ -355,6 +355,63 @@ mod tests {
     fn parse_apollo_state_missing_apollo_key() {
         let html = r#"<html><head><script id="__NEXT_DATA__" type="application/json">{"props":{"pageProps":{}}}</script></head></html>"#;
         assert!(parse_apollo_state(html).is_err());
+    }
+
+    #[test]
+    fn parse_ranking_maps_works_in_nodes_order() {
+        // "Work:zzz" ranks first despite sorting after "Work:aaa" as a map key,
+        // proving order comes from nodes, not Apollo object key order.
+        let apollo = json!({
+            "ROOT_QUERY": {
+                "rankedWorks({\"first\":100,\"genre\":\"FANTASY\",\"period\":\"WEEKLY\"})": {
+                    "nodes": [
+                        {"__ref": "Work:zzz"},
+                        {"__ref": "Work:aaa"}
+                    ]
+                }
+            },
+            "Work:zzz": {"title": "First", "publicEpisodeCount": 27},
+            "Work:aaa": {"title": "Second", "publicEpisodeCount": 3}
+        });
+        let result = parse_ranking(&apollo).unwrap();
+        assert_eq!(
+            result,
+            vec![
+                json!({"id": "zzz", "title": "First", "page": 27}),
+                json!({"id": "aaa", "title": "Second", "page": 3}),
+            ]
+        );
+    }
+
+    #[test]
+    fn parse_ranking_skips_non_work_refs_and_missing_entries() {
+        let apollo = json!({
+            "ROOT_QUERY": {
+                "rankedWorks({\"first\":100,\"genre\":null,\"period\":\"WEEKLY\"})": {
+                    "nodes": [
+                        {"__ref": "KakuyomuNextWork:next1"},
+                        {"__ref": "Work:missing"},
+                        {"__ref": "Work:ok"}
+                    ]
+                }
+            },
+            "KakuyomuNextWork:next1": {"title": "Next", "publicEpisodeCount": 1},
+            "Work:ok": {"title": "Kept", "publicEpisodeCount": 5}
+        });
+        let result = parse_ranking(&apollo).unwrap();
+        assert_eq!(
+            result,
+            vec![json!({"id": "ok", "title": "Kept", "page": 5})]
+        );
+    }
+
+    #[test]
+    fn parse_ranking_errors_when_ranked_works_absent() {
+        // A schema change must surface as an error, not a silently empty list.
+        let apollo = json!({"ROOT_QUERY": {"visitor": null}});
+        assert!(parse_ranking(&apollo).is_err());
+        let no_root = json!({"Work:abc": {"title": "T"}});
+        assert!(parse_ranking(&no_root).is_err());
     }
 
     #[test]
