@@ -35,7 +35,7 @@ const REFRESH_FAVORITE_SQL: &str = "UPDATE favorites SET
 /// Periodically sync favorite metadata in the background.
 ///
 /// - narou / nocturne: Bulk API fetch supports multiple IDs, so a fixed interval (10 min) suffices.
-/// - kakuyomu: HTML scraping fetches one at a time, so sleep(3,600,000ms / count)
+/// - kakuyomu: The GraphQL endpoint serves one work per query, so sleep(3,600,000ms / count)
 ///   distributes requests evenly over 1 hour.
 pub fn start_sync(state: AppState) {
     tracing::info!("[sync] starting background sync");

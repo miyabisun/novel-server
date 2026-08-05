@@ -4,6 +4,11 @@ use serde_json::{json, Map, Value};
 
 const TYPE: &str = "kakuyomu";
 
+// kakuyomu serves its site data from an unauthenticated GraphQL endpoint
+// (introspection is disabled, so field names here come from observed traffic).
+// Episode bodies are NOT exposed over GraphQL — fetch_page still scrapes HTML.
+const GRAPHQL_URL: &str = "https://kakuyomu.jp/graphql";
+
 const RANKING_GENRES: &[(&str, &str)] = &[
     ("異世界ファンタジー", "fantasy"),
     ("現代ファンタジー", "action"),
@@ -14,120 +19,163 @@ const RANKING_GENRES: &[(&str, &str)] = &[
     ("ホラー", "horror"),
 ];
 
-fn parse_apollo_state(html: &str) -> Result<Value, AppError> {
-    let doc = Html::parse_document(html);
-    let sel =
-        Selector::parse("#__NEXT_DATA__").map_err(|_| AppError::Internal("Bad selector".into()))?;
-    let el = doc
-        .select(&sel)
-        .next()
-        .ok_or_else(|| AppError::Upstream("Failed to parse kakuyomu work page".into()))?;
-    let raw: String = el.text().collect();
-    let json: Value = serde_json::from_str(&raw)?;
-    json.get("props")
-        .and_then(|p| p.get("pageProps"))
-        .and_then(|pp| pp.get("__APOLLO_STATE__"))
-        .cloned()
-        .ok_or_else(|| AppError::Upstream("Apollo state not found".into()))
+const WORK_QUERY: &str = "query($id: ID!) { work(id: $id) { \
+    title introduction lastEpisodePublishedAt \
+    tableOfContents { episodeUnions { __typename ... on Episode { id title } } } } }";
+
+const SEARCH_QUERY: &str = "query($q: String!) { \
+    searchWorks(first: 20, query: $q) { nodes { id title publicEpisodeCount } } }";
+
+/// Genre slugs and periods come from fixed whitelists (RANKING_GENRES and the
+/// route layer's VALID_PERIODS), and map to GraphQL enums by uppercasing.
+/// "all" means the overall ranking, which omits the genre argument.
+fn ranking_query(genre: &str, period: &str) -> String {
+    let genre_arg = if genre == "all" {
+        String::new()
+    } else {
+        format!(", genre: {}", genre.to_ascii_uppercase())
+    };
+    format!(
+        "query {{ rankedWorks(first: 100, period: {}{}) {{ nodes {{ id title publicEpisodeCount }} }} }}",
+        period.to_ascii_uppercase(),
+        genre_arg
+    )
 }
 
-fn extract_work(apollo: &Value, id: &str) -> Result<WorkInfo, AppError> {
-    let key = format!("Work:{}", id);
-    let work = apollo
-        .get(&key)
-        .ok_or_else(|| AppError::Upstream("Work not found in Apollo state".into()))?;
-
-    let title = work["title"].as_str().unwrap_or_default().to_string();
-    let story = work["introduction"]
-        .as_str()
-        .unwrap_or_default()
-        .to_string();
-    let novelupdated_at = work["lastEpisodePublishedAt"]
-        .as_str()
-        .filter(|value| crate::time::parse_upstream_timestamp(value).is_some())
-        .map(str::to_string);
-
-    Ok(WorkInfo {
-        title,
-        story,
-        novelupdated_at,
-    })
+async fn graphql(
+    client: &reqwest::Client,
+    query: &str,
+    variables: Value,
+) -> Result<Value, AppError> {
+    let res = client
+        .post(GRAPHQL_URL)
+        .json(&json!({"query": query, "variables": variables}))
+        .send()
+        .await?;
+    if !res.status().is_success() {
+        return Err(AppError::Upstream(format!(
+            "kakuyomu graphql error: {}",
+            res.status()
+        )));
+    }
+    extract_data(res.json().await?)
 }
 
-fn extract_episodes(apollo: &Value, _id: &str) -> Vec<EpisodeInfo> {
-    let obj = match apollo.as_object() {
-        Some(o) => o,
-        None => return Vec::new(),
+/// A 200 response can still carry failures; never treat those as success.
+fn extract_data(body: Value) -> Result<Value, AppError> {
+    if let Some(first) = body
+        .get("errors")
+        .and_then(Value::as_array)
+        .and_then(|e| e.first())
+    {
+        return Err(AppError::Upstream(format!(
+            "kakuyomu graphql error: {}",
+            first["message"].as_str().unwrap_or("unknown")
+        )));
+    }
+    match body.get("data") {
+        Some(data) if !data.is_null() => Ok(data.clone()),
+        _ => Err(AppError::Upstream(
+            "kakuyomu graphql response has no data".into(),
+        )),
+    }
+}
+
+/// Required-field readers: a missing or mistyped field means the schema
+/// drifted, and must fail loudly. Defaulting instead would let the background
+/// sync overwrite good favorite metadata with blanks and zeros.
+fn require_str<'a>(node: &'a Value, field: &str) -> Result<&'a str, AppError> {
+    node.get(field)
+        .and_then(Value::as_str)
+        .ok_or_else(|| AppError::Upstream(format!("kakuyomu response missing {}", field)))
+}
+
+fn require_u64(node: &Value, field: &str) -> Result<u64, AppError> {
+    node.get(field)
+        .and_then(Value::as_u64)
+        .ok_or_else(|| AppError::Upstream(format!("kakuyomu response missing {}", field)))
+}
+
+fn work_summary(node: &Value) -> Result<Value, AppError> {
+    Ok(json!({
+        "id": require_str(node, "id")?,
+        "title": require_str(node, "title")?,
+        "page": require_u64(node, "publicEpisodeCount")?,
+    }))
+}
+
+fn parse_ranking(data: &Value) -> Result<Vec<Value>, AppError> {
+    let nodes = data
+        .get("rankedWorks")
+        .and_then(|r| r.get("nodes"))
+        .and_then(Value::as_array)
+        .ok_or_else(|| AppError::Upstream("rankedWorks not found in kakuyomu response".into()))?;
+    // Every genre normally ranks 100 works; an empty list means upstream broke
+    if nodes.is_empty() {
+        return Err(AppError::Upstream(
+            "kakuyomu ranking returned no works".into(),
+        ));
+    }
+    nodes.iter().map(work_summary).collect()
+}
+
+fn parse_search(data: &Value) -> Result<Vec<Value>, AppError> {
+    let nodes = data
+        .get("searchWorks")
+        .and_then(|r| r.get("nodes"))
+        .and_then(Value::as_array)
+        .ok_or_else(|| AppError::Upstream("searchWorks not found in kakuyomu response".into()))?;
+    // Zero hits is a legitimate search result, so an empty list stays Ok here
+    nodes.iter().map(work_summary).collect()
+}
+
+/// Episodes come flattened from `tableOfContents` chapters in reading order.
+/// Union members other than Episode (if any appear) are skipped.
+fn parse_work(data: &Value) -> Result<(WorkInfo, Vec<EpisodeInfo>), AppError> {
+    let work = match data.get("work") {
+        Some(w) if !w.is_null() => w,
+        _ => return Err(AppError::Upstream("Work not found".into())),
     };
 
-    let mut pages = Vec::new();
+    // introduction and lastEpisodePublishedAt are genuinely optional upstream;
+    // everything else read here is required
+    let info = WorkInfo {
+        title: require_str(work, "title")?.to_string(),
+        story: work["introduction"]
+            .as_str()
+            .unwrap_or_default()
+            .to_string(),
+        novelupdated_at: work["lastEpisodePublishedAt"]
+            .as_str()
+            .filter(|value| crate::time::parse_upstream_timestamp(value).is_some())
+            .map(str::to_string),
+    };
+
+    let chapters = work
+        .get("tableOfContents")
+        .and_then(Value::as_array)
+        .ok_or_else(|| AppError::Upstream("kakuyomu response missing tableOfContents".into()))?;
+
+    let mut episodes = Vec::new();
     let mut num = 0u64;
-
-    // Collect TOC chapter keys in order
-    let mut toc_keys: Vec<&String> = obj
-        .keys()
-        .filter(|k| k.starts_with("TableOfContentsChapter"))
-        .collect();
-    toc_keys.sort();
-
-    for toc_key in toc_keys {
-        let chapter = &obj[toc_key];
-        let episode_unions = match chapter.get("episodeUnions") {
-            Some(Value::Array(arr)) => arr,
-            _ => continue,
-        };
-        for ep_ref in episode_unions {
-            let ref_str = match ep_ref.get("__ref").and_then(|r| r.as_str()) {
-                Some(r) => r,
-                None => continue,
-            };
-            let ep = match apollo.get(ref_str) {
-                Some(e) => e,
-                None => continue,
-            };
+    for chapter in chapters {
+        let unions = chapter
+            .get("episodeUnions")
+            .and_then(Value::as_array)
+            .ok_or_else(|| AppError::Upstream("kakuyomu response missing episodeUnions".into()))?;
+        for ep in unions {
+            if ep["__typename"].as_str() != Some("Episode") {
+                continue;
+            }
             num += 1;
-            pages.push(EpisodeInfo {
+            episodes.push(EpisodeInfo {
                 num,
-                id: ep["id"].as_str().unwrap_or_default().to_string(),
-                title: ep["title"].as_str().unwrap_or_default().to_string(),
+                id: require_str(ep, "id")?.to_string(),
+                title: require_str(ep, "title")?.to_string(),
             });
         }
     }
-    pages
-}
-
-/// Extract the ranked work list from a ranking page's Apollo state.
-/// Order comes from `ROOT_QUERY.rankedWorks(...).nodes`, which lists
-/// `Work:` refs in rank order (kakuyomu Next entries use other typenames).
-fn parse_ranking(apollo: &Value) -> Result<Vec<Value>, AppError> {
-    let root = apollo
-        .get("ROOT_QUERY")
-        .and_then(|r| r.as_object())
-        .ok_or_else(|| AppError::Upstream("ROOT_QUERY not found in kakuyomu ranking".into()))?;
-    let nodes = root
-        .iter()
-        .find(|(key, _)| key.starts_with("rankedWorks("))
-        .and_then(|(_, ranked)| ranked.get("nodes"))
-        .and_then(|n| n.as_array())
-        .ok_or_else(|| AppError::Upstream("rankedWorks not found in kakuyomu ranking".into()))?;
-
-    let mut result = Vec::new();
-    for node in nodes {
-        let ref_str = match node.get("__ref").and_then(|r| r.as_str()) {
-            Some(r) if r.starts_with("Work:") => r,
-            _ => continue,
-        };
-        let work = match apollo.get(ref_str) {
-            Some(w) => w,
-            None => continue,
-        };
-        result.push(json!({
-            "id": ref_str.strip_prefix("Work:").unwrap_or_default(),
-            "title": work["title"].as_str().unwrap_or_default(),
-            "page": work["publicEpisodeCount"].as_u64().unwrap_or(0),
-        }));
-    }
-    Ok(result)
+    Ok((info, episodes))
 }
 
 pub async fn fetch_ranking(
@@ -135,16 +183,8 @@ pub async fn fetch_ranking(
     genre: &str,
     rank_type: &str,
 ) -> Result<Vec<Value>, AppError> {
-    let url = format!("https://kakuyomu.jp/rankings/{}/{}", genre, rank_type);
-    let res = client.get(&url).send().await?;
-    if !res.status().is_success() {
-        return Err(AppError::Upstream(format!(
-            "kakuyomu ranking error: {}",
-            res.status()
-        )));
-    }
-    let apollo = parse_apollo_state(&res.text().await?)?;
-    parse_ranking(&apollo)
+    let data = graphql(client, &ranking_query(genre, rank_type), json!({})).await?;
+    parse_ranking(&data)
 }
 
 pub async fn fetch_ranking_list(client: &reqwest::Client, period: &str) -> Result<Value, AppError> {
@@ -171,50 +211,20 @@ pub async fn fetch_ranking_list(client: &reqwest::Client, period: &str) -> Resul
 }
 
 pub async fn fetch_search(client: &reqwest::Client, word: &str) -> Result<Value, AppError> {
-    let url = format!("https://kakuyomu.jp/search?q={}", urlencoding::encode(word));
-    let res = client.get(&url).send().await?;
-    if !res.status().is_success() {
-        return Err(AppError::Upstream(format!(
-            "kakuyomu search error: {}",
-            res.status()
-        )));
-    }
-    let apollo = parse_apollo_state(&res.text().await?)?;
-    let obj = apollo
-        .as_object()
-        .ok_or_else(|| AppError::Upstream("Invalid Apollo state".into()))?;
-
-    let mut results = Vec::new();
-    for (key, val) in obj {
-        if !key.starts_with("Work:") {
-            continue;
-        }
-        let id = key.strip_prefix("Work:").unwrap_or_default();
-        results.push(json!({
-            "id": id,
-            "title": val["title"].as_str().unwrap_or_default(),
-            "page": val["publicEpisodeCount"].as_u64().unwrap_or(0),
-        }));
-    }
-    Ok(Value::Array(results))
+    let data = graphql(client, SEARCH_QUERY, json!({"q": word})).await?;
+    Ok(Value::Array(parse_search(&data)?))
 }
 
-async fn fetch_work(client: &reqwest::Client, id: &str) -> Result<Value, AppError> {
-    let url = format!("https://kakuyomu.jp/works/{}", id);
-    let res = client.get(&url).send().await?;
-    if !res.status().is_success() {
-        return Err(AppError::Upstream(format!(
-            "kakuyomu work error: {}",
-            res.status()
-        )));
-    }
-    parse_apollo_state(&res.text().await?)
+async fn fetch_work_data(
+    client: &reqwest::Client,
+    id: &str,
+) -> Result<(WorkInfo, Vec<EpisodeInfo>), AppError> {
+    let data = graphql(client, WORK_QUERY, json!({"id": id})).await?;
+    parse_work(&data)
 }
 
 pub async fn fetch_toc(client: &reqwest::Client, id: &str) -> Result<Value, AppError> {
-    let apollo = fetch_work(client, id).await?;
-    let work = extract_work(&apollo, id)?;
-    let episodes = extract_episodes(&apollo, id);
+    let (work, episodes) = fetch_work_data(client, id).await?;
     let eps: Vec<Value> = episodes
         .iter()
         .map(|e| json!({"num": e.num, "title": e.title}))
@@ -226,9 +236,7 @@ pub async fn fetch_toc(client: &reqwest::Client, id: &str) -> Result<Value, AppE
 }
 
 pub async fn fetch_detail(client: &reqwest::Client, id: &str) -> Result<Value, AppError> {
-    let apollo = fetch_work(client, id).await?;
-    let work = extract_work(&apollo, id)?;
-    let episodes = extract_episodes(&apollo, id);
+    let (work, episodes) = fetch_work_data(client, id).await?;
     Ok(json!({
         "title": work.title,
         "synopsis": work.story,
@@ -237,9 +245,7 @@ pub async fn fetch_detail(client: &reqwest::Client, id: &str) -> Result<Value, A
 }
 
 pub async fn fetch_datum(client: &reqwest::Client, id: &str) -> Result<Value, AppError> {
-    let apollo = fetch_work(client, id).await?;
-    let work = extract_work(&apollo, id)?;
-    let episodes = extract_episodes(&apollo, id);
+    let (work, episodes) = fetch_work_data(client, id).await?;
     let pages: Vec<Value> = episodes
         .iter()
         .map(|e| {
@@ -283,8 +289,7 @@ pub async fn fetch_page(
     // Small numbers are sequential page numbers that need resolution
     if let Ok(num) = page_id.parse::<u64>() {
         if num < 100_000 {
-            let apollo = fetch_work(client, id).await?;
-            let episodes = extract_episodes(&apollo, id);
+            let (_, episodes) = fetch_work_data(client, id).await?;
             let ep = episodes
                 .get((num as usize).wrapping_sub(1))
                 .ok_or_else(|| AppError::Upstream(format!("Episode {} not found", page_id)))?;
@@ -300,6 +305,8 @@ pub async fn fetch_page(
             res.status()
         )));
     }
+    // Episode bodies are only published as HTML; this selector is the one
+    // remaining scraping dependency on kakuyomu's page markup.
     let doc = Html::parse_document(&res.text().await?);
     let sel = Selector::parse(".widget-episodeBody")
         .map_err(|_| AppError::Internal("Bad selector".into()))?;
@@ -323,57 +330,51 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    fn make_next_data(apollo_state: Value) -> String {
-        let next_data = json!({
-            "props": {
-                "pageProps": {
-                    "__APOLLO_STATE__": apollo_state
-                }
+    #[test]
+    fn extract_data_returns_data() {
+        let body = json!({"data": {"work": {"title": "T"}}});
+        assert_eq!(extract_data(body).unwrap(), json!({"work": {"title": "T"}}));
+    }
+
+    #[test]
+    fn extract_data_errors_take_precedence_over_data() {
+        // kakuyomu returns errors alongside "data": {"work": null} for a
+        // missing work; the error must win over the partial data.
+        let body = json!({
+            "errors": [{"message": "Not found: xyz"}],
+            "data": {"work": null}
+        });
+        let err = extract_data(body).unwrap_err();
+        assert!(format!("{:?}", err).contains("Not found: xyz"));
+    }
+
+    #[test]
+    fn extract_data_missing_or_null_data_is_error() {
+        assert!(extract_data(json!({})).is_err());
+        assert!(extract_data(json!({"data": null})).is_err());
+    }
+
+    #[test]
+    fn ranking_query_uppercases_enums_and_omits_genre_for_all() {
+        let q = ranking_query("love_story", "weekly");
+        assert!(q.contains("period: WEEKLY"));
+        assert!(q.contains("genre: LOVE_STORY"));
+        let overall = ranking_query("all", "daily");
+        assert!(overall.contains("period: DAILY"));
+        assert!(!overall.contains("genre:"));
+    }
+
+    #[test]
+    fn parse_ranking_maps_nodes_in_order() {
+        let data = json!({
+            "rankedWorks": {
+                "nodes": [
+                    {"id": "zzz", "title": "First", "publicEpisodeCount": 27},
+                    {"id": "aaa", "title": "Second", "publicEpisodeCount": 3}
+                ]
             }
         });
-        format!(
-            r#"<html><head><script id="__NEXT_DATA__" type="application/json">{}</script></head><body></body></html>"#,
-            next_data
-        )
-    }
-
-    #[test]
-    fn parse_apollo_state_extracts_state() {
-        let state = json!({"Work:123": {"title": "Test"}});
-        let html = make_next_data(state.clone());
-        let result = parse_apollo_state(&html).unwrap();
-        assert_eq!(result, state);
-    }
-
-    #[test]
-    fn parse_apollo_state_missing_next_data() {
-        let html = "<html><body>no data</body></html>";
-        assert!(parse_apollo_state(html).is_err());
-    }
-
-    #[test]
-    fn parse_apollo_state_missing_apollo_key() {
-        let html = r#"<html><head><script id="__NEXT_DATA__" type="application/json">{"props":{"pageProps":{}}}</script></head></html>"#;
-        assert!(parse_apollo_state(html).is_err());
-    }
-
-    #[test]
-    fn parse_ranking_maps_works_in_nodes_order() {
-        // "Work:zzz" ranks first despite sorting after "Work:aaa" as a map key,
-        // proving order comes from nodes, not Apollo object key order.
-        let apollo = json!({
-            "ROOT_QUERY": {
-                "rankedWorks({\"first\":100,\"genre\":\"FANTASY\",\"period\":\"WEEKLY\"})": {
-                    "nodes": [
-                        {"__ref": "Work:zzz"},
-                        {"__ref": "Work:aaa"}
-                    ]
-                }
-            },
-            "Work:zzz": {"title": "First", "publicEpisodeCount": 27},
-            "Work:aaa": {"title": "Second", "publicEpisodeCount": 3}
-        });
-        let result = parse_ranking(&apollo).unwrap();
+        let result = parse_ranking(&data).unwrap();
         assert_eq!(
             result,
             vec![
@@ -384,152 +385,147 @@ mod tests {
     }
 
     #[test]
-    fn parse_ranking_skips_non_work_refs_and_missing_entries() {
-        let apollo = json!({
-            "ROOT_QUERY": {
-                "rankedWorks({\"first\":100,\"genre\":null,\"period\":\"WEEKLY\"})": {
-                    "nodes": [
-                        {"__ref": "KakuyomuNextWork:next1"},
-                        {"__ref": "Work:missing"},
-                        {"__ref": "Work:ok"}
-                    ]
-                }
-            },
-            "KakuyomuNextWork:next1": {"title": "Next", "publicEpisodeCount": 1},
-            "Work:ok": {"title": "Kept", "publicEpisodeCount": 5}
-        });
-        let result = parse_ranking(&apollo).unwrap();
-        assert_eq!(
-            result,
-            vec![json!({"id": "ok", "title": "Kept", "page": 5})]
-        );
-    }
-
-    #[test]
-    fn parse_ranking_errors_when_ranked_works_absent() {
+    fn parse_ranking_errors_when_ranked_works_absent_or_empty() {
         // A schema change must surface as an error, not a silently empty list.
-        let apollo = json!({"ROOT_QUERY": {"visitor": null}});
-        assert!(parse_ranking(&apollo).is_err());
-        let no_root = json!({"Work:abc": {"title": "T"}});
-        assert!(parse_ranking(&no_root).is_err());
+        assert!(parse_ranking(&json!({})).is_err());
+        assert!(parse_ranking(&json!({"rankedWorks": {"nodes": null}})).is_err());
+        // Genres always rank works, so an empty list is a failure too
+        assert!(parse_ranking(&json!({"rankedWorks": {"nodes": []}})).is_err());
     }
 
     #[test]
-    fn extract_work_basic() {
-        let apollo = json!({
-            "Work:abc": {
-                "title": "My Novel",
-                "introduction": "A great story",
-                "lastEpisodePublishedAt": "2025-01-15T10:30:00Z"
+    fn parse_ranking_errors_on_malformed_node() {
+        // A node missing a required field must not degrade to ""/0 — the
+        // background sync would propagate those blanks into stored favorites.
+        let missing_title = json!({
+            "rankedWorks": {"nodes": [{"id": "a", "publicEpisodeCount": 5}]}
+        });
+        assert!(parse_ranking(&missing_title).is_err());
+        let mistyped_count = json!({
+            "rankedWorks": {"nodes": [{"id": "a", "title": "T", "publicEpisodeCount": "5"}]}
+        });
+        assert!(parse_ranking(&mistyped_count).is_err());
+    }
+
+    #[test]
+    fn parse_search_preserves_order_and_allows_empty() {
+        let data = json!({
+            "searchWorks": {
+                "nodes": [
+                    {"id": "b", "title": "Best match", "publicEpisodeCount": 5},
+                    {"id": "a", "title": "Second match", "publicEpisodeCount": 178}
+                ]
             }
         });
-        let work = extract_work(&apollo, "abc").unwrap();
+        let result = parse_search(&data).unwrap();
+        assert_eq!(result[0]["id"], "b");
+        assert_eq!(result[1]["page"], 178);
+
+        // Zero hits is a legitimate result, not an upstream failure
+        let empty = parse_search(&json!({"searchWorks": {"nodes": []}})).unwrap();
+        assert!(empty.is_empty());
+
+        assert!(parse_search(&json!({})).is_err());
+    }
+
+    #[test]
+    fn parse_work_extracts_metadata_and_flattens_chapters_in_order() {
+        let data = json!({
+            "work": {
+                "title": "My Novel",
+                "introduction": "A great story",
+                "lastEpisodePublishedAt": "2025-01-15T10:30:00Z",
+                "tableOfContents": [
+                    {"episodeUnions": [
+                        {"__typename": "Episode", "id": "ep1", "title": "Chapter 1"},
+                        {"__typename": "Episode", "id": "ep2", "title": "Chapter 2"}
+                    ]},
+                    {"episodeUnions": [
+                        {"__typename": "Episode", "id": "ep3", "title": "Chapter 3"}
+                    ]}
+                ]
+            }
+        });
+        let (work, episodes) = parse_work(&data).unwrap();
         assert_eq!(work.title, "My Novel");
         assert_eq!(work.story, "A great story");
         assert_eq!(
             work.novelupdated_at,
             Some("2025-01-15T10:30:00Z".to_string())
         );
+        assert_eq!(episodes.len(), 3);
+        assert_eq!(episodes[0].num, 1);
+        assert_eq!(episodes[0].id, "ep1");
+        assert_eq!(episodes[2].num, 3);
+        assert_eq!(episodes[2].title, "Chapter 3");
     }
 
     #[test]
-    fn extract_work_missing_id() {
-        let apollo = json!({"Work:other": {"title": "X"}});
-        assert!(extract_work(&apollo, "abc").is_err());
-    }
-
-    #[test]
-    fn extract_work_missing_optional_fields() {
-        let apollo = json!({
-            "Work:abc": {}
+    fn parse_work_skips_non_episode_unions_without_numbering_them() {
+        let data = json!({
+            "work": {
+                "title": "T",
+                "tableOfContents": [
+                    {"episodeUnions": [
+                        {"__typename": "SomethingElse"},
+                        {"__typename": "Episode", "id": "ep1", "title": "Only"}
+                    ]}
+                ]
+            }
         });
-        let work = extract_work(&apollo, "abc").unwrap();
-        assert_eq!(work.title, "");
+        let (_, episodes) = parse_work(&data).unwrap();
+        assert_eq!(episodes.len(), 1);
+        assert_eq!(episodes[0].num, 1);
+        assert_eq!(episodes[0].id, "ep1");
+    }
+
+    #[test]
+    fn parse_work_missing_work_is_error() {
+        assert!(parse_work(&json!({})).is_err());
+        assert!(parse_work(&json!({"work": null})).is_err());
+    }
+
+    #[test]
+    fn parse_work_tolerates_missing_optional_fields() {
+        // Only introduction and lastEpisodePublishedAt are optional
+        let data = json!({"work": {"title": "T", "tableOfContents": []}});
+        let (work, episodes) = parse_work(&data).unwrap();
+        assert_eq!(work.title, "T");
         assert_eq!(work.story, "");
         assert!(work.novelupdated_at.is_none());
+        assert!(episodes.is_empty());
     }
 
     #[test]
-    fn extract_work_invalid_date() {
-        let apollo = json!({
-            "Work:abc": {
+    fn parse_work_errors_on_missing_required_fields() {
+        // No title
+        assert!(parse_work(&json!({"work": {"tableOfContents": []}})).is_err());
+        // No tableOfContents
+        assert!(parse_work(&json!({"work": {"title": "T"}})).is_err());
+        // Chapter without episodeUnions
+        assert!(parse_work(&json!({
+            "work": {"title": "T", "tableOfContents": [{}]}
+        }))
+        .is_err());
+        // Episode without id
+        assert!(parse_work(&json!({
+            "work": {"title": "T", "tableOfContents": [
+                {"episodeUnions": [{"__typename": "Episode", "title": "no id"}]}
+            ]}
+        }))
+        .is_err());
+    }
+
+    #[test]
+    fn parse_work_drops_invalid_date() {
+        let data = json!({
+            "work": {
                 "title": "T",
+                "tableOfContents": [],
                 "lastEpisodePublishedAt": "not-a-date"
             }
         });
-        let work = extract_work(&apollo, "abc").unwrap();
+        let (work, _) = parse_work(&data).unwrap();
         assert!(work.novelupdated_at.is_none());
-    }
-
-    #[test]
-    fn extract_episodes_basic() {
-        let apollo = json!({
-            "TableOfContentsChapter:ch1": {
-                "episodeUnions": [
-                    {"__ref": "Episode:ep1"},
-                    {"__ref": "Episode:ep2"}
-                ]
-            },
-            "Episode:ep1": {"id": "ep1", "title": "Chapter 1"},
-            "Episode:ep2": {"id": "ep2", "title": "Chapter 2"}
-        });
-        let episodes = extract_episodes(&apollo, "abc");
-        assert_eq!(episodes.len(), 2);
-        assert_eq!(episodes[0].num, 1);
-        assert_eq!(episodes[0].id, "ep1");
-        assert_eq!(episodes[0].title, "Chapter 1");
-        assert_eq!(episodes[1].num, 2);
-        assert_eq!(episodes[1].id, "ep2");
-    }
-
-    #[test]
-    fn extract_episodes_sorted_by_chapter_key() {
-        let apollo = json!({
-            "TableOfContentsChapter:ch2": {
-                "episodeUnions": [{"__ref": "Episode:ep3"}]
-            },
-            "TableOfContentsChapter:ch1": {
-                "episodeUnions": [{"__ref": "Episode:ep1"}, {"__ref": "Episode:ep2"}]
-            },
-            "Episode:ep1": {"id": "ep1", "title": "Ep 1"},
-            "Episode:ep2": {"id": "ep2", "title": "Ep 2"},
-            "Episode:ep3": {"id": "ep3", "title": "Ep 3"}
-        });
-        let episodes = extract_episodes(&apollo, "abc");
-        assert_eq!(episodes.len(), 3);
-        // ch1 episodes come first since keys are sorted
-        assert_eq!(episodes[0].title, "Ep 1");
-        assert_eq!(episodes[1].title, "Ep 2");
-        assert_eq!(episodes[2].title, "Ep 3");
-    }
-
-    #[test]
-    fn extract_episodes_empty_when_no_chapters() {
-        let apollo = json!({"Work:abc": {"title": "T"}});
-        let episodes = extract_episodes(&apollo, "abc");
-        assert!(episodes.is_empty());
-    }
-
-    #[test]
-    fn extract_episodes_skips_missing_refs() {
-        let apollo = json!({
-            "TableOfContentsChapter:ch1": {
-                "episodeUnions": [
-                    {"__ref": "Episode:exists"},
-                    {"__ref": "Episode:missing"}
-                ]
-            },
-            "Episode:exists": {"id": "e1", "title": "Found"}
-        });
-        let episodes = extract_episodes(&apollo, "abc");
-        assert_eq!(episodes.len(), 1);
-        assert_eq!(episodes[0].id, "e1");
-    }
-
-    #[test]
-    fn extract_episodes_non_object_apollo() {
-        let apollo = json!("not an object");
-        let episodes = extract_episodes(&apollo, "abc");
-        assert!(episodes.is_empty());
     }
 }
