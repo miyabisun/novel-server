@@ -85,7 +85,11 @@ Danger uses the family danger role with no extra project meaning.
   compact-viewport reader actions (目次 / お気に入りから削除).
 - **Ranking control band:** sticky under header; same grey recipe as
   Reader (`.reader-bar`: `--c-surface`, hairline, `--subheader-h` 40px).
-  Controls 36px tall; band must fully cover scrolling card text.
+  Controls 36px tall; band must fully cover scrolling card text. Band
+  controls use the shared 2px focus outline with a local
+  `outline-offset: -1px` so the ring stays fully inside the 40px
+  border-box band (shared `outline-offset: 2px` clips under the app
+  header; offset 0 still leaves ~0.5px over the 1px bottom border).
 - **Ranking card:** rank, page count, title link, action rail (detail /
   favorite). Favorited rows: 3px fav left border.
 - **Favorite card:** progress, update time, type badge, title resume link,

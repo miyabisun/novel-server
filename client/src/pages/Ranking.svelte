@@ -304,6 +304,13 @@
 	font-size: var(--fs-label)
 	font-weight: 500
 
+	// Band is border-box 40px with a 1px bottom border → ~39px flex content.
+	// 36px controls sit with ~1.5px vertical inset; shared outline-offset 2px
+	// clips under the app header. Local -1px keeps the 2px ring fully inside
+	// the band without changing 40px/36px sizes.
+	&:focus-visible
+		outline-offset: -1px
+
 .genre-select, .period-select
 	padding: 0 var(--sp-sm)
 	cursor: pointer

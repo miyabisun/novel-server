@@ -152,6 +152,64 @@ test.describe('400px chrome', () => {
     expect(stillOpaque).toBe(true)
   })
 
+  test('ranking select focus rings stay fully inside the toolbar band', async ({ page }) => {
+    await page.goto('/')
+    await page.getByRole('link', { name: 'nar' }).click()
+    const toolbar = page.locator('.toolbar')
+    const genre = page.locator('.genre-select')
+    const period = page.locator('.period-select')
+    await expect(toolbar).toBeVisible()
+    await expect(genre).toBeVisible()
+    await expect(period).toBeVisible()
+
+    /**
+     * Keyboard focus so :focus-visible applies (mouse click often does not).
+     * Asserts the outline geometry fits inside the 40px toolbar (no clip under header).
+     */
+    async function assertFocusRingInsideBand(select) {
+      await select.focus()
+      // Re-trigger focus-visible via Tab cycle (Playwright focus() alone may not).
+      await page.keyboard.down('Shift')
+      await page.keyboard.press('Tab')
+      await page.keyboard.up('Shift')
+      await page.keyboard.press('Tab')
+
+      const metrics = await select.evaluate((el) => {
+        const cs = getComputedStyle(el)
+        const r = el.getBoundingClientRect()
+        const w = parseFloat(cs.outlineWidth) || 0
+        const off = parseFloat(cs.outlineOffset) || 0
+        return {
+          focusVisible: el.matches(':focus-visible'),
+          outlineStyle: cs.outlineStyle,
+          outlineWidth: w,
+          outlineOffset: off,
+          ringTop: r.top - w - off,
+          ringBottom: r.bottom + w + off,
+        }
+      })
+      const band = await toolbar.evaluate((el) => {
+        const r = el.getBoundingClientRect()
+        return { top: r.top, bottom: r.bottom }
+      })
+      const headerBottom = await page
+        .locator('header')
+        .evaluate((el) => el.getBoundingClientRect().bottom)
+
+      expect(metrics.focusVisible).toBe(true)
+      expect(metrics.outlineStyle).not.toBe('none')
+      expect(metrics.outlineWidth).toBe(2)
+      expect(metrics.outlineOffset).toBe(-1)
+      // Strict containment: ring must not enter the app header or leave the band.
+      const floor = Math.max(band.top, headerBottom)
+      expect(metrics.ringTop).toBeGreaterThanOrEqual(floor)
+      expect(metrics.ringBottom).toBeLessThanOrEqual(band.bottom)
+    }
+
+    await assertFocusRingInsideBand(genre)
+    await assertFocusRingInsideBand(period)
+  })
+
   test('reader moves 目次 and unfav into hamburger on compact viewport', async ({ page }) => {
     await page.goto('/')
     await page.getByRole('link', { name: 'テスト小説' }).click()
