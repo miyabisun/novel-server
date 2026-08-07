@@ -187,7 +187,7 @@
 </script>
 
 <div class="ranking">
-	<div class="toolbar">
+	<div class="toolbar" role="region" aria-label="一覧フィルタ">
 		<select class="genre-select" value={activeGenre} onchange={(e) => selectGenre(e.target.value)}>
 			{#each genreOptions as opt}
 				<option value={opt}>{opt}</option>
@@ -213,6 +213,7 @@
 		{/if}
 	</div>
 
+	<div class="ranking-body">
 	{#if loading || searchLoading}
 		<p class="status">読み込み中...</p>
 	{:else if error}
@@ -251,6 +252,7 @@
 	{:else if isSearchMode && searchResults}
 		<p class="status">検索結果が見つかりませんでした</p>
 	{/if}
+	</div>
 </div>
 
 {#if deleteTarget}
@@ -273,27 +275,37 @@
 
 <style lang="sass">
 .ranking
-	padding: var(--sp-lg) var(--sp-lg) 0
+	padding: 0
 
+// Same grey sticky band recipe as Reader .reader-bar.top
 .toolbar
 	display: flex
 	justify-content: space-between
 	align-items: center
-	margin-bottom: var(--sp-lg)
 	gap: var(--sp-sm)
 	position: sticky
 	top: var(--header-h)
-	background: var(--c-bg)
 	z-index: 50
-
-.genre-select, .period-select
-	padding: var(--sp-sm) var(--sp-md)
-	border: 1px solid var(--c-border)
+	height: var(--subheader-h)
+	padding: 0 var(--sp-lg)
 	background: var(--c-surface)
-	color: var(--c-text)
+	border-bottom: 1px solid var(--c-border)
+
+.ranking-body
+	padding: var(--sp-lg) var(--sp-lg) 0
+
+.genre-select, .period-select, .search-input, .search-btn
+	height: 36px
+	box-sizing: border-box
+	border: 1px solid var(--c-border)
 	border-radius: var(--radius-sm)
+	background: var(--c-bg)
+	color: var(--c-text)
 	font-size: var(--fs-label)
 	font-weight: 500
+
+.genre-select, .period-select
+	padding: 0 var(--sp-sm)
 	cursor: pointer
 	appearance: auto
 	min-width: 0
@@ -310,16 +322,14 @@
 	flex: 1
 	gap: var(--sp-sm)
 	min-width: 0
+	align-items: center
 
 .search-input
 	flex: 1
 	min-width: 0
-	padding: var(--sp-sm) var(--sp-md)
-	border: 1px solid var(--c-border)
-	background: var(--c-surface)
-	color: var(--c-text)
-	border-radius: var(--radius-sm)
+	padding: 0 var(--sp-sm)
 	font-size: var(--fs-body)
+	font-weight: 400
 
 	&::placeholder
 		color: var(--c-text-muted)
@@ -329,20 +339,15 @@
 
 .search-btn
 	flex-shrink: 0
-	padding: var(--sp-sm) var(--sp-md)
-	border: 1px solid var(--c-border)
-	background: var(--c-surface)
-	color: var(--c-text)
-	border-radius: var(--radius-sm)
-	font-size: var(--fs-label)
-	font-weight: 500
+	width: 36px
+	padding: 0
 	cursor: pointer
 	display: inline-flex
 	align-items: center
 	justify-content: center
 
 	&:hover
-		background: var(--c-border)
+		background: var(--c-surface-hover)
 
 	&:disabled
 		opacity: 0.5
@@ -441,11 +446,6 @@
 
 // Desktop
 @media (min-width: 800px)
-	.toolbar
-		padding-top: var(--sp-lg)
-		padding-bottom: var(--sp-lg)
-		margin-bottom: 0
-
 	.novel-card-wrapper:hover .novel-card
 		background-color: var(--c-surface-hover)
 

@@ -1,3 +1,58 @@
+// Sumi (dark) is the default on :root.
+// light  = Kinari (screen light, template neutrals + project blue accent)
+// e-paper = Washi (e-ink tuned; former OS-light palette)
+// system = no data-theme; OS light → Kinari, OS dark → Sumi
+
+=kinari-tokens
+	color-scheme: light
+	// Kinari neutrals from rust-svelte-template; project accent stays blue.
+	--c-bg: #faf6ef
+	--c-surface: #fffdf8
+	--c-surface-hover: rgba(154, 106, 0, 0.1)
+	--c-backdrop: rgba(58, 47, 40, 0.4)
+	--c-border: #e3d9c9
+	--c-text: #3a2f28
+	--c-text-muted: #6f6257
+	--c-danger: #9c2b1d
+	--c-danger-subtle: #f9e9e4
+	--c-accent: rgba(20, 100, 200, 0.95)
+	--c-accent-hover: rgba(10, 70, 160, 1)
+	--c-accent-subtle: rgba(20, 100, 200, 0.1)
+	--c-focus-ring: rgba(20, 100, 200, 0.6)
+	--c-fav: rgba(180, 120, 0, 0.95)
+	--c-fav-bright: rgba(170, 110, 0, 1)
+	--c-fav-border: rgba(180, 120, 0, 0.45)
+	--c-fav-hover: rgba(180, 120, 0, 0.1)
+	--c-site-narou: #1f6b3a
+	--c-site-kakuyomu: #14508c
+	--c-site-nocturne: #8f2b2b
+	--c-nav-favorite: #8a6a00
+
+=washi-tokens
+	color-scheme: light
+	// E-paper / Washi — contrast-first inks (tune on device).
+	--c-bg: #fafafa
+	--c-surface: #ffffff
+	--c-surface-hover: #f0f0f0
+	--c-backdrop: rgba(0, 0, 0, 0.4)
+	--c-border: #c9c9c4
+	--c-text: #222222
+	--c-text-muted: #4a4a4a
+	--c-danger: #8f1d16
+	--c-danger-subtle: #fdeeee
+	--c-accent: rgba(20, 100, 200, 0.95)
+	--c-accent-hover: rgba(10, 70, 160, 1)
+	--c-accent-subtle: rgba(20, 100, 200, 0.1)
+	--c-focus-ring: rgba(20, 100, 200, 0.6)
+	--c-fav: rgba(180, 120, 0, 0.95)
+	--c-fav-bright: rgba(170, 110, 0, 1)
+	--c-fav-border: rgba(180, 120, 0, 0.45)
+	--c-fav-hover: rgba(180, 120, 0, 0.1)
+	--c-site-narou: #1f6b3a
+	--c-site-kakuyomu: #14508c
+	--c-site-nocturne: #8f2b2b
+	--c-nav-favorite: #8a6a00
+
 \:root
 	// Spacing (Sumi template 4px base scale)
 	--sp-xs: 4px
@@ -7,36 +62,38 @@
 	--sp-xl: 24px
 	--sp-gutter: 12px
 
-	// Typography (Sumi template five roles: title / body / body-sm / label / caption)
+	// Typography
 	--fs-title: 17px
 	--fs-body: 16px
 	--fs-body-sm: 14px
 	--fs-label: 15px
 	--fs-caption: 12px
 
-	// Header height (nav-item: label line-box + vertical padding + nav-border 2px - margin 1px + header-border 1px)
-	--header-h: calc(var(--fs-label) * 1.6 + var(--sp-md) * 2 + 2px)
+	// Fixed chrome heights (template: header 48 / sub-header 40)
+	--header-h: 48px
+	--subheader-h: 40px
 
-	// Border Radius (Sumi template scale)
+	// Border Radius
 	--radius-sm: 6px
 	--radius-md: 8px
 	--radius-lg: 12px
 	--radius-full: 9999px
 
 	// Surfaces (Sumi = dark)
+	color-scheme: dark
 	--c-bg: #191919
 	--c-surface: #232323
 	--c-surface-hover: #2b2b2b
 	--c-backdrop: rgba(0, 0, 0, 0.6)
 
-	// Borders (single hairline; border-strong collapsed into border)
+	// Borders
 	--c-border: #333333
 
-	// Text hierarchy (on-surface + muted)
+	// Text hierarchy
 	--c-text: #e6e6e6
 	--c-text-muted: #9a9a9a
 
-	// Danger (red)
+	// Danger
 	--c-danger: #ff6b6b
 	--c-danger-subtle: #3a1a1a
 
@@ -45,86 +102,52 @@
 	--c-accent-hover: rgba(192, 222, 255, 0.85)
 	--c-accent-subtle: rgba(128, 192, 255, 0.15)
 
-	// Focus ring (accent at 60% opacity)
+	// Focus ring
 	--c-focus-ring: rgba(128, 192, 255, 0.6)
 
-	// Favorite (gold) — functional data color
+	// Favorite (gold)
 	--c-fav: rgba(255, 200, 50, 0.8)
 	--c-fav-bright: rgba(255, 200, 50, 1)
 	--c-fav-border: rgba(255, 200, 50, 0.3)
 	--c-fav-hover: rgba(255, 200, 50, 0.1)
 
-	// Site identity colors (functional data color; Sumi keeps the current 0.7-alpha hues)
+	// Site identity
 	--c-site-narou: rgba(100, 190, 120, 0.7)
 	--c-site-kakuyomu: rgba(100, 160, 220, 0.7)
 	--c-site-nocturne: rgba(200, 110, 110, 0.7)
 	--c-nav-favorite: rgba(220, 180, 50, 0.7)
 
-// Light mode — OS設定がライトのときだけ :root の色変数を上書きする。
-// 形・余白・フォント系の変数はダークと共通なので、色だけ再定義すればよい。
+\:root[data-theme="light"]
+	+kinari-tokens
+
+\:root[data-theme="e-paper"]
+	+washi-tokens
+
+\:root[data-theme="dark"]
+	color-scheme: dark
+
 @media (prefers-color-scheme: light)
-	\:root
-		// ─────────────────────────────────────────────
-		// TODO(あなた): 電子ペーパー向けに Washi 値を実機で詰めてください。
-		//   端末は階調が苦手で薄いグレーが潰れ／白飛びしやすいので、
-		//   「背景は思い切って白」「文字は十分濃く」「階層差は大きめ」が基本。
-		//   下の値はテンプレ準拠の出発点。実機で見て濃さ・コントラストを詰めてください。
-		//
-		// Surfaces
-		// 注意: --xxx の値の行末に // コメントを書くと値に混入する（Sassが剥がさない）
-		--c-bg: #fafafa
-		--c-surface: #ffffff
-		--c-surface-hover: #f0f0f0
-		--c-backdrop: rgba(0, 0, 0, 0.4)
-
-		// Borders
-		--c-border: #c9c9c4
-
-		// Text hierarchy（電子ペーパーでは最濃を黒へ寄せる）
-		--c-text: #222222
-		--c-text-muted: #4a4a4a
-
-		// Danger (red) — 白地では濃い赤へ（≥7:1）
-		--c-danger: #8f1d16
-		--c-danger-subtle: #fdeeee
-
-		// Accent (blue) — 淡い水色は白地で読めないので濃い青へ
-		--c-accent: rgba(20, 100, 200, 0.95)
-		--c-accent-hover: rgba(10, 70, 160, 1)
-		--c-accent-subtle: rgba(20, 100, 200, 0.1)
-
-		// Focus ring
-		--c-focus-ring: rgba(20, 100, 200, 0.6)
-
-		// Favorite (gold) — 白地では金が見えないので濃いアンバーへ
-		--c-fav: rgba(180, 120, 0, 0.95)
-		--c-fav-bright: rgba(170, 110, 0, 1)
-		--c-fav-border: rgba(180, 120, 0, 0.45)
-		--c-fav-hover: rgba(180, 120, 0, 0.1)
-
-		// ─────────────────────────────────────────────
-		// TODO(あなた): サイト識別色の Washi 値も実機で詰めてください。
-		//   電子ペーパーでは hue より濃度が手掛かり。ink-first で十分濃く。
-		//   下は暫定の darkness-ramp シード値。
-		--c-site-narou: #1f6b3a
-		--c-site-kakuyomu: #14508c
-		--c-site-nocturne: #8f2b2b
-		--c-nav-favorite: #8a6a00
+	\:root:not([data-theme])
+		+kinari-tokens
 
 *,
 *::before,
 *::after
 	box-sizing: border-box
 
-// Shared focus ring (all interactive elements). The UA default ring is
-// superseded here and never removed outright.
+// Shared focus ring
 \:focus-visible
 	outline: 2px solid var(--c-focus-ring)
 	outline-offset: 2px
 
+\:focus:not(:focus-visible)
+	outline: none
+
 body
+	margin: 0
 	background-color: var(--c-bg)
 	color: var(--c-text)
+	font-family: system-ui, sans-serif
 	font-size: var(--fs-body)
 	line-height: 1.6
 
@@ -137,6 +160,23 @@ a
 
 	&:hover
 		color: var(--c-accent-hover)
+
+// Quiet 36px icon control (template icon-btn)
+.icon-btn
+	display: inline-flex
+	align-items: center
+	justify-content: center
+	width: 36px
+	height: 36px
+	padding: 0
+	border: none
+	border-radius: var(--radius-sm)
+	background: transparent
+	color: var(--c-text)
+	cursor: pointer
+
+	&:hover
+		background: var(--c-surface-hover)
 
 table
 	table-layout: fixed
@@ -193,7 +233,6 @@ li
 	&.right
 		right: var(--sp-lg)
 
-	// Gesture "release" threshold is signalled with accent, per the template.
 	&.ready
 		color: var(--c-accent)
 

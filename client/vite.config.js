@@ -21,4 +21,8 @@ export default defineConfig({
       '/api': 'http://localhost:3000',
     },
   },
+  test: {
+    // Playwright specs live under e2e/; keep them out of vitest.
+    exclude: ['**/node_modules/**', '**/e2e/**', '**/build/**'],
+  },
 })

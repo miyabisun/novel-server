@@ -6,6 +6,7 @@
 	import { decodeHtml } from '$lib/decode.js';
 	import ConfirmModal from '$lib/components/ConfirmModal.svelte';
 	import Icon from '$lib/components/Icon.svelte';
+	import { clearReaderChrome, updateReaderChrome } from '$lib/readerChrome.svelte.js';
 
 	let { params } = $props();
 	let html = $state('');
@@ -147,6 +148,20 @@
 		return () => window.removeEventListener('keydown', handleKeydown);
 	});
 
+	// Compact viewports surface 目次 / unfav via the global hamburger instead of the bar.
+	$effect(() => {
+		updateReaderChrome({
+			active: true,
+			showToc: totalPages > 1,
+			showUnfav: isFav,
+			goToc: () => navigate(`/novel/${params.type}/${params.id}/toc`),
+			requestUnfav: () => {
+				if (isFav) showUnfavConfirm = true;
+			},
+		});
+		return () => clearReaderChrome();
+	});
+
 	function readerSwipe(node) {
 		let startX, startY, locked, horizontal;
 
@@ -255,6 +270,7 @@
 	display: flex
 	align-items: center
 	justify-content: space-between
+	min-height: var(--subheader-h)
 	padding: var(--sp-sm) 2.5%
 	background: var(--c-surface)
 	border-bottom: 1px solid var(--c-border)
@@ -370,5 +386,11 @@
 
 	:global(br)
 		line-height: 2
+
+// On compact viewports, 目次 and unfav live in the app hamburger (fat-finger + rare use).
+@media (max-width: 799px)
+	.toc-btn,
+	.fav-btn-remove
+		display: none
 
 </style>

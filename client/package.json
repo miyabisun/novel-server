@@ -8,11 +8,13 @@
     "build": "vp build",
     "preview": "vp preview --port 5173 --host",
     "test": "vp test",
+    "test:e2e": "playwright test",
     "fmt": "vp fmt",
     "lint": "vp lint",
     "check": "vp check"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@sveltejs/vite-plugin-svelte": "^7.0.0",
     "normalize.css": "^8.0.1",
     "oxfmt": "^0.41.0",
