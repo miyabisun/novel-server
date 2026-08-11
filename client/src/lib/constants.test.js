@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { navItems } from './constants.js'
+import { navItems, navSwipeLabel } from './constants.js'
 
 describe('navItems', () => {
-  it('renames the root tab to novel without changing its path', () => {
-    expect(navItems[0]).toMatchObject({ label: 'novel', path: '/' })
+  it('shows favorite on desktop and novel as compact short for the root tab', () => {
+    expect(navItems[0]).toMatchObject({
+      label: 'favorite',
+      short: 'novel',
+      path: '/',
+    })
   })
 
   it('keeps ranking type labels and adds 3-letter mobile shorts', () => {
@@ -15,8 +19,16 @@ describe('navItems', () => {
     expect(byLabel.kakuyomu.path).toBe('/ranking/kakuyomu')
     expect(byLabel.nocturne.path).toBe('/ranking/nocturne')
   })
+})
 
-  it('does not shorten the novel tab (site name stays full)', () => {
-    expect(navItems[0].short).toBeUndefined()
+describe('navSwipeLabel', () => {
+  it('prefers short over label so swipe hints match compact header text', () => {
+    expect(navSwipeLabel(navItems[0])).toBe('novel')
+    expect(navSwipeLabel(navItems[0])).not.toBe('favorite')
+    expect(navSwipeLabel(navItems[1])).toBe('nar')
+  })
+
+  it('falls back to label when short is absent', () => {
+    expect(navSwipeLabel({ label: 'favorite' })).toBe('favorite')
   })
 })

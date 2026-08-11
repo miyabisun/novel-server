@@ -27,7 +27,8 @@ colors:
   site-kakuyomu-dark: "rgba(100, 160, 220, 0.7)"
   site-nocturne: "#8f2b2b"
   site-nocturne-dark: "rgba(200, 110, 110, 0.7)"
-  # CSS token remains --c-nav-favorite; tab label is "novel".
+  # CSS token remains --c-nav-favorite; root tab is "favorite" (≥800px)
+  # and "novel" (≤799px brand dual when title is hidden).
   nav-favorite: "#8a6a00"
   nav-favorite-dark: "rgba(220, 180, 50, 0.7)"
 ---
@@ -78,9 +79,10 @@ Danger uses the family danger role with no extra project meaning.
 
 - **App header:** sticky 48px. Left: non-interactive `novel-server` title
   (hidden ≤799px) + **nav tabs** (domain override — tabs are primary
-  navigation). Labels: `novel` (`/` favorites), `narou` / `kakuyomu` /
-  `nocturne` (desktop); site tabs shorten to `nar` / `kak` / `noc` at
-  ≤799px. Right: hamburger (36px). Menu order: optional auth email
+  navigation). Labels (≥800px): `favorite` (`/` favorites), `narou` /
+  `kakuyomu` / `nocturne`. Compact (≤799px): root shortens to `novel`
+  (brand dual while the title is hidden); site tabs to `nar` / `kak` /
+  `noc`. Right: hamburger (36px). Menu order: optional auth email
   (read-only, Cloudflare Access), **テーマ設定** first action, then
   compact-viewport reader actions (目次 / お気に入りから削除).
 - **Ranking control band:** sticky under header; same grey recipe as

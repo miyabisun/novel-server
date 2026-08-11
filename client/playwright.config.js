@@ -20,11 +20,20 @@ export default defineConfig({
   projects: [
     {
       name: 'mobile-400',
+      testMatch: /chrome-mobile\.spec\.js$/,
       use: {
         ...devices['Desktop Chrome'],
         viewport: { width: 400, height: 800 },
         isMobile: true,
         hasTouch: true,
+      },
+    },
+    {
+      name: 'desktop-1280',
+      testMatch: /chrome-desktop\.spec\.js$/,
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 800 },
       },
     },
   ],

@@ -1,6 +1,6 @@
 <script>
 	import { router, navigate, getBasePath } from '$lib/router.svelte.js';
-	import { navItems } from '$lib/constants.js';
+	import { navItems, navSwipeLabel } from '$lib/constants.js';
 	import Header from '$lib/components/Header.svelte';
 	import Ranking from './pages/Ranking.svelte';
 	import Reader from './pages/Reader.svelte';
@@ -30,7 +30,7 @@
 	});
 
 	const tabPaths = navItems.map((item) => item.path);
-	const tabLabels = navItems.map((item) => item.label);
+	const tabLabels = navItems.map(navSwipeLabel);
 
 	function getTabIndex() {
 		if (router.index === 0) return 0;
