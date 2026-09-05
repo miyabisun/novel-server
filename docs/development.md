@@ -67,6 +67,18 @@ DATABASE_PATH=./novel.db
 
 ## Docker ビルド
 
+Rust は Dockerfile の固定 toolchain でビルドします。release profile は
+`opt-level = 3`、`lto = false`、`codegen-units = 16`、`strip = true` とし、
+小さなサイズ増を許容してビルド時間を抑えます。
+
+cargo-chef が Rust の依存を、Bun の frozen lockfile が frontend の依存を分離します。
+Cargo の version 更新だけなら依存層と frontend を再利用し、アプリ本体は更新後の
+Cargo.toml / Cargo.lock でビルドします。
+
+公開ビルドは `v*.*.*` tag の push 時のみです。tag と Cargo version を照合し、
+GHCR の `build-cache` tag に中間層を保存します (`mode=max`)。
+製品の semver / `latest` tag とキャッシュは別です。
+
 ```bash
 docker build -t novel-server .
 docker run -p 3000:3000 -v novel-data:/data novel-server
