@@ -23,15 +23,13 @@ cargo run --release
 
 > リバースプロキシのサブパス配下にデプロイする場合は `BASE_PATH` 環境変数を設定してください。
 
-## 設定
+## 環境変数
 
-| 環境変数 | デフォルト | 説明 |
-|---|---|---|
-| `DATABASE_PATH` | `/data/novel.db` | SQLite データベースファイルのパス |
-| `PORT` | `3000` | サーバーのポート番号 |
-| `BASE_PATH` | (なし) | リバースプロキシ配下で使う場合のパス (例: `/novels`)。ランタイム設定のみで再ビルド不要。 |
-
-データベースは初回起動時に自動生成されます。
+現行名・必須/任意・既定値・不正値の扱いは
+[README.md の Environment Variables](README.md#environment-variables) を正本とします。
+`PORT`、`DATABASE_PATH`、`BASE_PATH`、`PUBLIC_BASE_URL`、`NODE_ENV`、`RUST_LOG` を扱います。
+サブパス配下で `PUBLIC_BASE_URL` を指定するときは、公開 URL にサブパスも含めてください。
+データベースファイルは初回起動時に生成しますが、親ディレクトリは事前に用意してください。
 
 ## 主な機能
 
