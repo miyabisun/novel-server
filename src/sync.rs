@@ -148,33 +148,12 @@ async fn sync_syosetu(state: &AppState, module: &ModuleType, type_str: &str) {
     }
 }
 
-struct KakuyomuCycle {
-    ids: std::vec::IntoIter<String>,
-    count: usize,
-    index: usize,
-}
-
-impl KakuyomuCycle {
-    fn new(ids: Vec<String>) -> Self {
-        let count = ids.len();
-        Self {
-            ids: ids.into_iter(),
-            count,
-            index: 0,
-        }
-    }
-}
-
-impl Iterator for KakuyomuCycle {
-    type Item = (usize, String, Duration);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let id = self.ids.next()?;
-        let index = self.index;
-        self.index += 1;
-        let offset_ms = KAKUYOMU_CYCLE.as_millis() * index as u128 / self.count as u128;
-        Some((index, id, Duration::from_millis(offset_ms as u64)))
-    }
+fn kakuyomu_cycle(ids: Vec<String>) -> impl Iterator<Item = (usize, String, Duration)> {
+    let count = ids.len();
+    ids.into_iter().enumerate().map(move |(index, id)| {
+        let offset_ms = KAKUYOMU_CYCLE.as_millis() * index as u128 / count as u128;
+        (index, id, Duration::from_millis(offset_ms as u64))
+    })
 }
 
 fn start_kakuyomu_sync(state: AppState) {
@@ -191,7 +170,7 @@ fn start_kakuyomu_sync(state: AppState) {
             }
 
             let cycle_started = tokio::time::Instant::now();
-            for (index, id, offset) in KakuyomuCycle::new(ids) {
+            for (index, id, offset) in kakuyomu_cycle(ids) {
                 tokio::time::sleep_until(cycle_started + offset).await;
 
                 match module.fetch_datum(&state.http, &id).await {
@@ -344,7 +323,7 @@ mod tests {
     #[test]
     fn kakuyomu_cycle_has_fixed_cadence_and_advances_after_failure() {
         let ids = (1..=18).map(|n| format!("work-{n}")).collect();
-        let mut cycle = KakuyomuCycle::new(ids);
+        let mut cycle = kakuyomu_cycle(ids);
 
         let first = cycle.next().unwrap();
         assert_eq!(
@@ -363,6 +342,23 @@ mod tests {
         assert_eq!(last.0, 17);
         assert_eq!(last.1, "work-18");
         assert_eq!(last.2, Duration::from_secs(3_400));
+    }
+
+    #[test]
+    fn kakuyomu_cycle_handles_empty_single_and_fractional_slots() {
+        assert!(kakuyomu_cycle(Vec::new()).next().is_none());
+        assert_eq!(
+            kakuyomu_cycle(vec!["only".to_string()]).collect::<Vec<_>>(),
+            vec![(0, "only".to_string(), Duration::ZERO)]
+        );
+
+        let slots = kakuyomu_cycle((0..7).map(|n| n.to_string()).collect())
+            .map(|(_, _, offset)| offset.as_millis())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            slots,
+            [0, 514_285, 1_028_571, 1_542_857, 2_057_142, 2_571_428, 3_085_714]
+        );
     }
 
     #[test]
@@ -387,7 +383,7 @@ mod tests {
     #[test]
     fn kakuyomu_cycle_keeps_its_snapshot_when_favorites_change() {
         let mut favorites = vec!["a-work".to_string(), "b-work".to_string()];
-        let cycle = KakuyomuCycle::new(favorites.clone());
+        let cycle = kakuyomu_cycle(favorites.clone());
 
         favorites.remove(0);
         favorites.push("c-work".to_string());
