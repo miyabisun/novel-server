@@ -143,3 +143,30 @@ docker run -v ./novel.db:/data/novel.db novel-server
 ```bash
 sqlite3 /data/novel.db ".backup /backup/novel-$(date +%Y%m%d).db"
 ```
+
+### 旧 single-user バックアップの復元
+
+現行版は旧 single-user DB の直接アップグレードを提供しない。`users` テーブルがなく、
+`favorites` に `user_id` がない旧バックアップだけ、過去 tag `v0.2.12` の
+`bin/migrate` を使ってから現行版へ戻す。現行 DB にはこのスクリプトを実行しない。
+
+1. 整合性のあるバックアップ原本を保持し、稼働データとは別の作業ディレクトリへコピーする。
+   WAL 未反映の DB ファイルだけをコピーしたものは使わない。
+2. repository checkout から次を実行する（Bash・Git・sqlite3 CLI が必要）。
+   パスと所有者メールアドレスは実際の値へ置き換える。旧スクリプトは SQL に値を埋め込むため、
+   シングルクォートを含むパス・メールアドレスは使わない。
+
+   ```bash
+   restore_dir=$(mktemp -d)
+   cp /backup/old-single-user.db "$restore_dir/novel.db"
+   git show v0.2.12:bin/migrate > "$restore_dir/migrate"
+   bash "$restore_dir/migrate" "$restore_dir/novel.db" 'owner@example.com'
+   sqlite3 "$restore_dir/novel.db" 'PRAGMA integrity_check; PRAGMA foreign_key_check;'
+   ```
+
+3. 整合性検査が `ok`、外部キー違反が空であることと、お気に入り件数・指定所有者・
+   タイトル・話数・既読位置が引き継がれたことを原本と照合する。整数以外の更新日時は
+   `NULL` になり、現行版の同期で再取得される。失敗時は原本から新しいコピーでやり直す。
+4. サービスを停止し、現在のデータディレクトリ全体を退避する。変換済み DB を配置し、
+   以前の DB の WAL/SHM と混在させず、所有権・書込権限を合わせて現行版を起動する。
+   お気に入り・既読位置を確認する。復旧が必要なら停止して退避したデータと対応版へ戻す。
