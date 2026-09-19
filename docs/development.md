@@ -2,17 +2,21 @@
 
 ## 技術スタック
 
-- **バックエンド**: Rust (axum + tokio + rusqlite)
-- **フロントエンド**: Svelte 5 + Vite + Sass
+- バックエンド: Rust (axum + tokio + rusqlite)
+- フロントエンド: Svelte 5 + Vite + Sass
 
 ## 前提条件
 
 - [Rust](https://rustup.rs/) (stable)
-- [Node.js](https://nodejs.org/) (フロントエンドビルド用)
+- [Node.js](https://nodejs.org/) 20.19以上または22.12以上とnpm (フロントエンドビルド用)
+- Git、OpenSSL・SQLite向けのビルドツール（Debian/Ubuntuなら `build-essential pkg-config libssl-dev`）
 
 ## セットアップ
 
 ```bash
+git clone https://github.com/miyabisun/novel-server.git
+cd novel-server
+
 # フロントエンドの依存インストール + ビルド
 cd client && npm install && npm run build && cd ..
 
@@ -35,7 +39,7 @@ bin/dev
 
 `http://localhost:3000` にアクセスするとアプリケーションが表示されます。
 
-> **注意:** フロントエンドの変更時は `cd client && npm run build` でリビルドしてください。
+フロントエンドの変更時は `cd client && npm run build` でリビルドしてください。
 
 ## コマンド一覧
 
@@ -61,19 +65,23 @@ DATABASE_PATH=./novel.db
 
 | 環境変数 | デフォルト | 説明 |
 |---|---|---|
-| `DATABASE_PATH` | `./novel.db` | SQLite データベースファイルのパス（Docker 環境では `/data/novel.db`） |
+| `DATABASE_PATH` | `/data/novel.db` | SQLiteファイルのパス。上の`.env`例で`./novel.db`へ変更する |
 | `PORT` | `3000` | サーバーのポート番号 |
 | `BASE_PATH` | (なし) | リバースプロキシ配下で使う場合のパス |
 
+親ディレクトリはアプリが作成しないため、書込み可能な場所を指定してください。
+環境変数の全項目は[README](../README.md#environment-variables)を参照してください。
+
 ## Docker ビルド
 
-Rust は Dockerfile の固定 toolchain でビルドします。release profile は
-`opt-level = 3`、`lto = false`、`codegen-units = 16`、`strip = true` とし、
+RustはDockerfileの固定toolchainでビルドします。
+release profileは`opt-level = 3`、`lto = false`です。
+`codegen-units = 16`、`strip = true`も設定します。
 小さなサイズ増を許容してビルド時間を抑えます。
 
 cargo-chef が Rust の依存を、Bun の frozen lockfile が frontend の依存を分離します。
-Cargo の version 更新だけなら依存層と frontend を再利用し、アプリ本体は更新後の
-Cargo.toml / Cargo.lock でビルドします。
+Cargoのversion更新だけなら、依存層とfrontendを再利用します。
+アプリ本体は更新後のCargo.toml / Cargo.lockでビルドします。
 
 公開ビルドは `v*.*.*` tag の push 時のみです。tag と Cargo version を照合し、
 GHCR の `build-cache` tag に中間層を保存します (`mode=max`)。
@@ -81,7 +89,7 @@ GHCR の `build-cache` tag に中間層を保存します (`mode=max`)。
 
 ```bash
 docker build -t novel-server .
-docker run -p 3000:3000 -v novel-data:/data novel-server
+docker run -p 127.0.0.1:3000:3000 -v novel-data:/data novel-server
 ```
 
 ## リバースプロキシ
@@ -115,7 +123,8 @@ location /novels {
 
 ## マルチユーザー (Cloudflare Access)
 
-Cloudflare Access 経由で `Cf-Access-Authenticated-User-Email` ヘッダーが設定されると、メールアドレスごとにお気に入り・既読進捗・RSS フィードが自動的に分離されます。
+Cloudflare Accessは`Cf-Access-Authenticated-User-Email`ヘッダーで利用者を識別します。
+このメールアドレスごとに、お気に入り・既読位置・RSSフィードを分離します。
 
 - ヘッダーなしの場合はゲストユーザーとして動作
 - 未知のメールアドレスは自動で `users` テーブルに登録される

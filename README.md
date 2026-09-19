@@ -7,22 +7,46 @@ Includes favorites management and automatic reading progress tracking.
 
 ## Quick Start (Docker)
 
+Requires Docker. The named volume keeps favorites and reading progress across container restarts.
+
 ```bash
-docker run -p 3000:3000 -v novel-data:/data ghcr.io/miyabisun/novel-server:latest
+docker run -p 127.0.0.1:3000:3000 -v novel-data:/data ghcr.io/miyabisun/novel-server:latest
 ```
 
 Open `http://localhost:3000` in your browser.
 
 ## Quick Start (Rust)
 
+Requires Git, Rust, Node.js/npm, and the platform build tools for OpenSSL and SQLite.
+The Docker build uses Rust 1.96; the frontend requires Node.js 20.19+ or 22.12+.
+
 ```bash
+git clone https://github.com/miyabisun/novel-server.git
+cd novel-server
 cd client && npm install && npm run build && cd ..
-cargo run --release
+DATABASE_PATH=./novel.db cargo run --release --locked
 ```
 
 Open `http://localhost:3000` in your browser.
 
-> To deploy under a reverse proxy subpath, set the `BASE_PATH` environment variable.
+The database is created as `novel.db` in the checkout. Keep this file and its WAL/SHM files.
+For another location, create a writable parent directory before setting `DATABASE_PATH`.
+
+After opening the app, choose a site and ranking period, then open a novel.
+Use ★ to add a favorite. Reading progress is saved when a reader page loads.
+
+## Deployment and storage
+
+The Docker example exposes only localhost. The native server listens on all interfaces.
+There is no built-in login: without an identity header, users share the guest account.
+For remote access, configure access control at your proxy or network boundary.
+When using the Cloudflare identity header, prevent direct access around that proxy.
+
+Mount the entire data directory, not just the SQLite file, to preserve WAL/SHM files.
+See [SQLite operations](docs/development.md#sqlite-運用) for backup and old-database restoration.
+
+For a reverse proxy subpath, set `BASE_PATH`, for example `/novels`.
+See the [proxy examples](docs/development.md#リバースプロキシ).
 
 ## Environment Variables
 
@@ -38,24 +62,25 @@ All variables are optional. These are application defaults, including for a nati
 | `NODE_ENV` | No | Development cache behavior | Exactly `production` keeps the cached SPA HTML even after its modification time changes. Every other value, including empty, uses modification-time refresh. This variable does not control authentication. |
 | `RUST_LOG` | No | `info` | Log level or target filter, e.g. `debug` or `novel_server=debug`. Empty selects `error`. Invalid filter syntax prints a warning to stderr and disables logs. `LOG_LEVEL` is not read. |
 
-Without `PUBLIC_BASE_URL`, the origin uses `X-Forwarded-Proto` (default `http`),
-`X-Forwarded-Host` or `Host` (default `localhost:<PORT>`), then appends `BASE_PATH`.
-The database file is created on first startup; its parent directory is not created by the app.
+Without `PUBLIC_BASE_URL`, the origin uses `X-Forwarded-Proto` (default `http`).
+The host comes from `X-Forwarded-Host`, then `Host`, then `localhost:<PORT>`.
+`BASE_PATH` is appended to that origin.
+The database file is created on first startup. Its parent directory must already exist.
 The listener binds to `0.0.0.0`; Dockerfile explicitly sets `PORT=3000`.
-For deployment values and volume mounts, see the
-[home-server README](https://github.com/miyabisun/home-server/blob/main/README.md) and
-[sis/compose.yaml](https://github.com/miyabisun/home-server/blob/main/sis/compose.yaml).
+The Docker example mounts a named volume at `/data`, where the default database is stored.
 
 Sources: [configuration](src/config.rs), [startup](src/main.rs),
 [SPA cache](src/spa.rs), [feed URL resolution](src/routes/feed.rs).
 
 ## Features
 
-- **Rankings** — Browse rankings with period selection, synopsis preview, and swipe-to-add/remove favorites on mobile
+- **Rankings** — Select a period and preview synopses. Swipe to manage favorites on mobile.
 - **Reader** — Keyboard-navigable (arrow keys) page turning
 - **Favorites** — Add from rankings with ★, auto-sync metadata (page count, update time)
 - **Reading Progress** — Automatically saved when a page loads in the reader
-- **Multi-user** — When deployed behind Cloudflare Access that sets `Cf-Access-Authenticated-User-Email`, favorites and reading progress are automatically scoped per user. Without the header, operates as a single guest user.
+- **Multi-user** — Favorites and reading progress are scoped per user.
+  Cloudflare Access supplies the identity via `Cf-Access-Authenticated-User-Email`.
+  Without the header, everyone uses the guest account.
 
 ## Documentation
 
