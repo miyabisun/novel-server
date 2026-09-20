@@ -52,7 +52,7 @@ WAL/SHMも保持するため、SQLiteファイルだけでなくデータディ�
 ## 環境変数
 
 現行名・必須/任意・既定値・不正値の扱いは
-[README.md の Environment Variables](README.md#environment-variables) を正本とします。
+[README.md の Environment Variables](README.md#environment-variables) を参照してください。
 `PORT`、`DATABASE_PATH`、`BASE_PATH`、`PUBLIC_BASE_URL`、`NODE_ENV`、`RUST_LOG` を扱います。
 サブパス配下で `PUBLIC_BASE_URL` を指定するときは、公開 URL にサブパスも含めてください。
 データベースファイルは初回起動時に生成しますが、親ディレクトリは事前に用意してください。
