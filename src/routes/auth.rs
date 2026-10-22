@@ -26,7 +26,7 @@ async fn get_me(
     Extension(user_id): Extension<UserId>,
 ) -> Json<Value> {
     let email = {
-        let db = state.db.lock().unwrap();
+        let db = state.db.lock().expect("lock holders never panic");
         db.query_row(
             "SELECT email FROM users WHERE id = ?1",
             [user_id.0],

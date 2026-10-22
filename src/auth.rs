@@ -26,7 +26,7 @@ pub async fn resolve_user(
 }
 
 fn get_or_create_user(db: &Arc<Mutex<Connection>>, email: &str) -> UserId {
-    let conn = db.lock().unwrap();
+    let conn = db.lock().expect("lock holders never panic");
     conn.execute("INSERT OR IGNORE INTO users (email) VALUES (?1)", [email])
         .ok();
     let id = conn

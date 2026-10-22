@@ -26,8 +26,8 @@ const WORK_QUERY: &str = "query($id: ID!) { work(id: $id) { \
 const SEARCH_QUERY: &str = "query($q: String!) { \
     searchWorks(first: 20, query: $q) { nodes { id title publicEpisodeCount } } }";
 
-/// Genre slugs and periods come from fixed whitelists (RANKING_GENRES and the
-/// route layer's VALID_PERIODS), and map to GraphQL enums by uppercasing.
+/// Genre slugs and periods come from fixed whitelists (`RANKING_GENRES` and the
+/// route layer's `VALID_PERIODS`), and map to GraphQL enums by uppercasing.
 /// "all" means the overall ranking, which omits the genre argument.
 fn ranking_query(genre: &str, period: &str) -> String {
     let genre_arg = if genre == "all" {
@@ -62,7 +62,7 @@ async fn graphql(
 }
 
 /// A 200 response can still carry failures; never treat those as success.
-fn extract_data(body: Value) -> Result<Value, AppError> {
+fn extract_data(mut body: Value) -> Result<Value, AppError> {
     if let Some(first) = body
         .get("errors")
         .and_then(Value::as_array)
@@ -73,8 +73,8 @@ fn extract_data(body: Value) -> Result<Value, AppError> {
             first["message"].as_str().unwrap_or("unknown")
         )));
     }
-    match body.get("data") {
-        Some(data) if !data.is_null() => Ok(data.clone()),
+    match body.get_mut("data").map(Value::take) {
+        Some(data) if !data.is_null() => Ok(data),
         _ => Err(AppError::Upstream(
             "kakuyomu graphql response has no data".into(),
         )),
@@ -87,13 +87,13 @@ fn extract_data(body: Value) -> Result<Value, AppError> {
 fn require_str<'a>(node: &'a Value, field: &str) -> Result<&'a str, AppError> {
     node.get(field)
         .and_then(Value::as_str)
-        .ok_or_else(|| AppError::Upstream(format!("kakuyomu response missing {}", field)))
+        .ok_or_else(|| AppError::Upstream(format!("kakuyomu response missing {field}")))
 }
 
 fn require_u64(node: &Value, field: &str) -> Result<u64, AppError> {
     node.get(field)
         .and_then(Value::as_u64)
-        .ok_or_else(|| AppError::Upstream(format!("kakuyomu response missing {}", field)))
+        .ok_or_else(|| AppError::Upstream(format!("kakuyomu response missing {field}")))
 }
 
 fn work_summary(node: &Value) -> Result<Value, AppError> {
@@ -290,14 +290,16 @@ pub async fn fetch_page(
     if let Ok(num) = page_id.parse::<u64>() {
         if num < 100_000 {
             let (_, episodes) = fetch_work_data(client, id).await?;
-            let ep = episodes
-                .get((num as usize).wrapping_sub(1))
-                .ok_or_else(|| AppError::Upstream(format!("Episode {} not found", page_id)))?;
+            let ep = usize::try_from(num)
+                .ok()
+                .and_then(|n| n.checked_sub(1))
+                .and_then(|i| episodes.get(i))
+                .ok_or_else(|| AppError::Upstream(format!("Episode {page_id} not found")))?;
             episode_id = ep.id.clone();
         }
     }
 
-    let url = format!("https://kakuyomu.jp/works/{}/episodes/{}", id, episode_id);
+    let url = format!("https://kakuyomu.jp/works/{id}/episodes/{episode_id}");
     let res = client.get(&url).send().await?;
     if !res.status().is_success() {
         return Err(AppError::Upstream(format!(
@@ -345,7 +347,7 @@ mod tests {
             "data": {"work": null}
         });
         let err = extract_data(body).unwrap_err();
-        assert!(format!("{:?}", err).contains("Not found: xyz"));
+        assert!(format!("{err:?}").contains("Not found: xyz"));
     }
 
     #[test]

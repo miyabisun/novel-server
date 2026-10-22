@@ -73,7 +73,7 @@ async fn get_favorites(
     Extension(user_id): Extension<UserId>,
 ) -> Result<Json<Value>, AppError> {
     let rows = {
-        let db = state.db.lock().unwrap();
+        let db = state.db.lock().expect("lock holders never panic");
         let mut stmt = db.prepare(
             "SELECT type, id, title, novelupdated_at, page, read FROM favorites
              WHERE user_id = ?1 ORDER BY novelupdated_at DESC NULLS LAST",
@@ -126,7 +126,7 @@ async fn put_favorite(
     };
 
     let favorite = {
-        let db = state.db.lock().unwrap();
+        let db = state.db.lock().expect("lock holders never panic");
         // `read` seeds only new rows; ON CONFLICT leaves an existing bookmark
         // untouched so a re-registration never rewinds reading progress.
         db.execute(
@@ -193,7 +193,7 @@ async fn delete_favorite(
 ) -> Result<Json<Value>, AppError> {
     ModuleType::resolve(&type_str)?;
     let changes = {
-        let db = state.db.lock().unwrap();
+        let db = state.db.lock().expect("lock holders never panic");
         db.execute(
             "DELETE FROM favorites WHERE user_id = ?1 AND type = ?2 AND id = ?3",
             rusqlite::params![user_id.0, type_str, id],
@@ -236,7 +236,7 @@ async fn patch_progress(
         .ok_or_else(|| AppError::BadRequest("read is required".into()))?;
 
     let result = {
-        let db = state.db.lock().unwrap();
+        let db = state.db.lock().expect("lock holders never panic");
         let changes = db.execute(
             "UPDATE favorites SET read = ?1 WHERE user_id = ?2 AND type = ?3 AND id = ?4",
             rusqlite::params![read, user_id.0, type_str, id],
@@ -299,7 +299,7 @@ mod tests {
             .oneshot(
                 Request::builder()
                     .method("PUT")
-                    .uri(format!("/api/favorites/narou/{}", id))
+                    .uri(format!("/api/favorites/narou/{id}"))
                     .header("content-type", "application/json")
                     .body(axum::body::Body::from(body.to_string()))
                     .unwrap(),
@@ -312,7 +312,7 @@ mod tests {
     }
 
     fn stored_read(state: &AppState, id: &str) -> i64 {
-        let db = state.db.lock().unwrap();
+        let db = state.db.lock().expect("lock holders never panic");
         db.query_row(
             "SELECT read FROM favorites WHERE user_id = 1 AND type = 'narou' AND id = ?1",
             [id],

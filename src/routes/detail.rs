@@ -35,13 +35,13 @@ async fn get_detail(
     Path((type_str, id)): Path<(String, String)>,
 ) -> Result<Json<Arc<Value>>, AppError> {
     let module = ModuleType::resolve(&type_str)?;
-    let key = format!("novel:{}:{}:detail", type_str, id);
+    let key = format!("novel:{type_str}:{id}:detail");
 
     if let Some(cached) = state.cache.get(&key) {
         return Ok(Json(cached));
     }
 
-    let label = format!("fetchDetail {}/{}", type_str, id);
+    let label = format!("fetchDetail {type_str}/{id}");
     let detail = super::with_retry(&label, || module.fetch_detail(&state.http, &id)).await?;
     Ok(Json(state.cache.set(&key, detail, Some(DETAIL_TTL))))
 }

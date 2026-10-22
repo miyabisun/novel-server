@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 const MAX_ENTRIES: usize = 10_000;
-const SWEEP_INTERVAL: std::time::Duration = std::time::Duration::from_secs(3600);
+const SWEEP_INTERVAL: std::time::Duration = std::time::Duration::from_hours(1);
 
 struct CacheEntry {
     value: Arc<Value>,
@@ -25,7 +25,7 @@ impl Cache {
     /// Returns a shared handle to the cached value; cloning the `Arc` only bumps
     /// a refcount, so frequent hits avoid deep-cloning large JSON payloads.
     pub fn get(&self, key: &str) -> Option<Arc<Value>> {
-        let store = self.store.lock().unwrap();
+        let store = self.store.lock().expect("lock holders never panic");
         let entry = store.get(key)?;
         if let Some(expires_at) = entry.expires_at {
             if Instant::now() > expires_at {
@@ -38,7 +38,7 @@ impl Cache {
     /// Stores `value` and returns a shared handle to it, so the caller can serve
     /// the same allocation it just cached without cloning.
     pub fn set(&self, key: &str, value: Value, ttl_seconds: Option<u64>) -> Arc<Value> {
-        let mut store = self.store.lock().unwrap();
+        let mut store = self.store.lock().expect("lock holders never panic");
         if store.len() >= MAX_ENTRIES && !store.contains_key(key) {
             // Remove the first (oldest inserted) entry
             if let Some(oldest_key) = store.keys().next().cloned() {
@@ -57,7 +57,7 @@ impl Cache {
     }
 
     fn sweep(&self) {
-        let mut store = self.store.lock().unwrap();
+        let mut store = self.store.lock().expect("lock holders never panic");
         let now = Instant::now();
         store.retain(|_, entry| match entry.expires_at {
             Some(expires_at) => now <= expires_at,
@@ -146,7 +146,7 @@ mod tests {
         }
         // Adding one more should evict one
         cache.set("overflow", json!("new"), None);
-        let store = cache.store.lock().unwrap();
+        let store = cache.store.lock().expect("lock holders never panic");
         assert_eq!(store.len(), MAX_ENTRIES);
         assert!(store.contains_key("overflow"));
     }
@@ -159,7 +159,7 @@ mod tests {
         }
         // Updating existing key should not evict
         cache.set("k0", json!("updated"), None);
-        let store = cache.store.lock().unwrap();
+        let store = cache.store.lock().expect("lock holders never panic");
         assert_eq!(store.len(), MAX_ENTRIES);
         assert_eq!(*store.get("k0").unwrap().value, json!("updated"));
     }

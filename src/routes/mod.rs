@@ -85,20 +85,20 @@ where
             Err(e) => {
                 tracing::error!("{} attempt {} failed: {}", label, i + 1, e);
                 if i < 2 {
-                    tokio::time::sleep(std::time::Duration::from_millis(500 * (i as u64 + 1)))
+                    tokio::time::sleep(std::time::Duration::from_millis(500 * (u64::from(i) + 1)))
                         .await;
                 }
             }
         }
     }
     Err(AppError::Upstream(format!(
-        "Failed after 3 retries: {}",
-        label
+        "Failed after 3 retries: {label}"
     )))
 }
 
 pub fn build_router(state: AppState) -> Router {
     let base_path = state.config.base_path.clone();
+    let app_base = base_path.clone();
 
     let api = Router::new()
         .merge(ranking::routes())
@@ -127,9 +127,8 @@ pub fn build_router(state: AppState) -> Router {
             let bp = base_path.clone();
             async move { spa_fallback(&bp) }
         }))
-        .with_state(state.clone());
+        .with_state(state);
 
-    let app_base = state.config.base_path.clone();
     if app_base.is_empty() {
         sub
     } else {

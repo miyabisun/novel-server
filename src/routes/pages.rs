@@ -39,7 +39,7 @@ async fn get_page(
     Path((type_str, id, num)): Path<(String, String, String)>,
 ) -> Result<Json<Arc<Value>>, AppError> {
     let module = ModuleType::resolve(&type_str)?;
-    let key = format!("novel:{}:{}:page:{}", type_str, id, num);
+    let key = format!("novel:{type_str}:{id}:page:{num}");
 
     if let Some(cached) = state.cache.get(&key) {
         return Ok(Json(cached));
@@ -70,7 +70,7 @@ async fn patch_page(
     Path((type_str, id, num)): Path<(String, String, String)>,
 ) -> Result<Json<Arc<Value>>, AppError> {
     let module = ModuleType::resolve(&type_str)?;
-    let key = format!("novel:{}:{}:page:{}", type_str, id, num);
+    let key = format!("novel:{type_str}:{id}:page:{num}");
 
     fetch_and_cache(&state, &module, &id, &num, &key).await
 }
@@ -82,7 +82,7 @@ async fn fetch_and_cache(
     num: &str,
     key: &str,
 ) -> Result<Json<Arc<Value>>, AppError> {
-    let label = format!("fetchPage {}/{}/{}", id, num, key);
+    let label = format!("fetchPage {id}/{num}/{key}");
     let raw = super::with_retry(&label, || module.fetch_page(&state.http, id, num)).await?;
     let html = sanitize::clean(raw.as_deref().unwrap_or(""));
     Ok(Json(state.cache.set(

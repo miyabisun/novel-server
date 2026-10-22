@@ -28,7 +28,12 @@ utoipa-swagger-ui = { version = "9", features = ["axum"] }
 tower = { version = "0.5", features = ["util"] }
 
 [lints.clippy]
-all = "warn"
+pedantic = { level = "warn", priority = -1 }
+unwrap_used = "warn"
+undocumented_unsafe_blocks = "warn"
+missing_assert_message = "warn"
+# Fires inside code expanded by utoipa's `#[derive(OpenApi)]`; it cannot be fixed here.
+needless_for_each = "allow"
 
 [profile.release]
 opt-level = 3

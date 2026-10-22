@@ -29,19 +29,23 @@ async fn get_rss(
     Extension(user_id): Extension<UserId>,
     headers: HeaderMap,
 ) -> Result<impl IntoResponse, AppError> {
-    let items = load_favorite_updates(&state.db.lock().unwrap(), user_id.0)?;
+    let items = load_favorite_updates(
+        &state.db.lock().expect("lock holders never panic"),
+        user_id.0,
+    )?;
 
     let base = resolve_base_url(&headers, &state.config);
 
-    let mut xml = String::from(
+    let mut xml = format!(
         r#"<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0">
 <channel>
 <title>Novel Server - お気に入り更新</title>
 <description>お気に入り小説の更新情報</description>
+<link>{}</link>
 "#,
+        escape_xml(&base)
     );
-    xml.push_str(&format!("<link>{}</link>\n", escape_xml(&base)));
 
     for item in &items {
         xml.push_str(&build_item_xml(item, &base));
@@ -66,27 +70,21 @@ fn escape_xml(s: &str) -> String {
 fn build_item_xml(item: &FavoriteUpdate, base: &str) -> String {
     let next_page = next_page(item.read, item.page);
     let link = format!("{}/novel/{}/{}/{}", base, item.type_str, item.id, next_page);
-    let mut xml = String::from("<item>\n");
-    xml.push_str(&format!("<title>{}</title>\n", escape_xml(&item.title)));
-    xml.push_str(&format!("<link>{}</link>\n", escape_xml(&link)));
-    xml.push_str(&format!(
-        "<description>{}話 / 既読{}話</description>\n",
-        item.page, item.read
-    ));
-    if let Some(dt) = item
+    let pub_date = item
         .novelupdated_at
         .and_then(crate::time::unix_timestamp_to_rfc2822)
-    {
-        xml.push_str(&format!("<pubDate>{}</pubDate>\n", escape_xml(&dt)));
-    }
-    xml.push_str(&format!(
-        "<guid>{}/{}/{}</guid>\n",
+        .map(|dt| format!("<pubDate>{}</pubDate>\n", escape_xml(&dt)))
+        .unwrap_or_default();
+    format!(
+        "<item>\n<title>{}</title>\n<link>{}</link>\n<description>{}話 / 既読{}話</description>\n{pub_date}<guid>{}/{}/{}</guid>\n</item>\n",
+        escape_xml(&item.title),
+        escape_xml(&link),
+        item.page,
+        item.read,
         escape_xml(base),
         escape_xml(&item.type_str),
         escape_xml(&item.id)
-    ));
-    xml.push_str("</item>\n");
-    xml
+    )
 }
 
 #[cfg(test)]
@@ -126,6 +124,11 @@ mod tests {
         assert!(xml.contains("<description>100話 / 既読98話</description>"));
         assert!(xml.contains("<pubDate>Sat, 14 Mar 2026 00:00:00 +0000</pubDate>"));
         assert!(xml.contains("<guid>http://localhost:3000/narou/n1234ab</guid>"));
+        assert_eq!(
+            xml,
+            "<item>\n<title>Test Novel</title>\n<link>http://localhost:3000/novel/narou/n1234ab/99</link>\n<description>100話 / 既読98話</description>\n<pubDate>Sat, 14 Mar 2026 00:00:00 +0000</pubDate>\n<guid>http://localhost:3000/narou/n1234ab</guid>\n</item>\n",
+            "item fields keep their order and one line each"
+        );
     }
 
     #[test]

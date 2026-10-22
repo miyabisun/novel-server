@@ -5,9 +5,8 @@ use serde_json::{json, Map, Value};
 
 /// Normalize a single API response item: ncode->id, title->trim, general_all_no->page
 pub fn map_item(obj: &Value) -> Value {
-    let map = match obj.as_object() {
-        Some(m) => m,
-        None => return obj.clone(),
+    let Some(map) = obj.as_object() else {
+        return obj.clone();
     };
     let mut acc = Map::new();
     for (key, val) in map {
@@ -15,15 +14,13 @@ pub fn map_item(obj: &Value) -> Value {
             "ncode" => {
                 let id = val
                     .as_str()
-                    .map(|s| Value::String(s.to_lowercase()))
-                    .unwrap_or_else(|| val.clone());
+                    .map_or_else(|| val.clone(), |s| Value::String(s.to_lowercase()));
                 acc.insert("id".to_string(), id);
             }
             "title" => {
                 let title = val
                     .as_str()
-                    .map(|s| Value::String(s.trim().to_string()))
-                    .unwrap_or_else(|| val.clone());
+                    .map_or_else(|| val.clone(), |s| Value::String(s.trim().to_string()));
                 acc.insert("title".to_string(), title);
             }
             "general_all_no" => {
@@ -65,7 +62,7 @@ pub async fn fetch_api(
     let mut req = client.get(api_url);
     req = req.query(&all_params);
     if let Some(hdrs) = headers {
-        for (name, val) in hdrs.iter() {
+        for (name, val) in &hdrs {
             req = req.header(name, val);
         }
     }
@@ -83,7 +80,7 @@ pub async fn fetch_api(
 pub fn process_api_response(json: Vec<Value>) -> Vec<Value> {
     json.into_iter()
         .skip(1)
-        .filter(|v| v.is_object())
+        .filter(serde_json::Value::is_object)
         .map(|v| map_item(&v))
         .collect()
 }
@@ -93,8 +90,8 @@ pub fn parse_toc(html: &str) -> TocResult {
     let doc = Html::parse_document(html);
 
     // Title: .p-novel__title or <title>
-    let title_sel = Selector::parse(".p-novel__title").unwrap();
-    let title_fallback_sel = Selector::parse("title").unwrap();
+    let title_sel = Selector::parse(".p-novel__title").expect("hard-coded selector is valid CSS");
+    let title_fallback_sel = Selector::parse("title").expect("hard-coded selector is valid CSS");
     let title = doc
         .select(&title_sel)
         .next()
@@ -108,8 +105,8 @@ pub fn parse_toc(html: &str) -> TocResult {
         .unwrap_or_default();
 
     // Episodes: .p-eplist__sublist
-    let ep_sel = Selector::parse(".p-eplist__sublist").unwrap();
-    let a_sel = Selector::parse("a").unwrap();
+    let ep_sel = Selector::parse(".p-eplist__sublist").expect("hard-coded selector is valid CSS");
+    let a_sel = Selector::parse("a").expect("hard-coded selector is valid CSS");
     let mut episodes = Vec::new();
     for (i, el) in doc.select(&ep_sel).enumerate() {
         let num = (i as u64) + 1;
@@ -125,15 +122,14 @@ pub fn parse_toc(html: &str) -> TocResult {
     }
 
     // Last page: find <a> with text "最後へ" and extract ?p=N
-    let a_all_sel = Selector::parse("a").unwrap();
     let mut last_page = 1u64;
-    for el in doc.select(&a_all_sel) {
+    for el in doc.select(&a_sel) {
         let text: String = el.text().collect();
         if text.trim() == "最後へ" {
             if let Some(href) = el.value().attr("href") {
                 if let Some(cap) = href.find("p=") {
                     let rest = &href[cap + 2..];
-                    let num_str: String = rest.chars().take_while(|c| c.is_ascii_digit()).collect();
+                    let num_str: String = rest.chars().take_while(char::is_ascii_digit).collect();
                     if let Ok(n) = num_str.parse::<u64>() {
                         last_page = n;
                     }
@@ -217,15 +213,15 @@ pub static NOCTURNE: SyosetuSite = SyosetuSite {
     over18: true,
 };
 
-/// Output fields for ranking/search (title, writer, ncode, general_all_no, noveltype)
+/// Output fields for ranking/search (title, writer, ncode, `general_all_no`, noveltype)
 const OF_RANKING: &str = "t-w-n-ga-nt";
-/// Output fields for datum/data (ncode, title, general_all_no, story, general_lastup).
+/// Output fields for datum/data (ncode, title, `general_all_no`, story, `general_lastup`).
 /// `general_lastup` (last episode published) is the favorites sort key; it is
 /// exposed as `novelupdated_at` in the datum (see `to_datum`). The API's own
 /// `novelupdated_at` is deliberately *not* requested: it also moves on author
 /// edits to existing text (typo fixes), which we do not want to surface.
 const OF_DATUM: &str = "n-t-ga-s-gl";
-/// Output fields for detail (title, story, general_all_no)
+/// Output fields for detail (title, story, `general_all_no`)
 const OF_DETAIL: &str = "t-s-ga";
 
 fn with_headers(site: &SyosetuSite, req: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
@@ -301,11 +297,11 @@ pub async fn fetch_ranking_list(
     period: &str,
 ) -> Result<Value, AppError> {
     let order = match period {
-        "daily" => "dailypoint",
         "weekly" => "weeklypoint",
         "monthly" => "monthlypoint",
         "quarter" => "quarterpoint",
         "yearly" => "yearlypoint",
+        // "daily" and any unknown period
         _ => "dailypoint",
     };
 
@@ -465,7 +461,7 @@ pub async fn fetch_toc(
     let mut handles = Vec::new();
     for page in 2..=first.last_page {
         let client = client.clone();
-        let url = format!("{}?p={}", base_url, page);
+        let url = format!("{base_url}?p={page}");
         handles.push(tokio::spawn(async move {
             let res = with_headers(site, client.get(&url)).send().await?;
             if !res.status().is_success() {

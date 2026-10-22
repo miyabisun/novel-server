@@ -5,7 +5,7 @@ use serde_json::Value;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-const KAKUYOMU_CYCLE: Duration = Duration::from_secs(60 * 60);
+const KAKUYOMU_CYCLE: Duration = Duration::from_hours(1);
 
 /// Refresh a favorite's metadata from a fetched datum. Shared by the periodic
 /// sync and the fire-and-forget fetch on registration so the two never diverge.
@@ -21,7 +21,7 @@ const KAKUYOMU_CYCLE: Duration = Duration::from_secs(60 * 60);
 /// periodic source sync repair old timestamp strings without guessing whether
 /// those ambiguous values represented UTC or JST.
 ///
-/// Params: ?1 = title, ?2 = page, ?3 = novelupdated_at, ?4 = type, ?5 = id.
+/// Params: ?1 = title, ?2 = page, ?3 = `novelupdated_at`, ?4 = type, ?5 = id.
 const REFRESH_FAVORITE_SQL: &str = "UPDATE favorites SET
         title = COALESCE(?1, title),
         page = COALESCE(?2, page),
@@ -39,17 +39,13 @@ const REFRESH_FAVORITE_SQL: &str = "UPDATE favorites SET
 ///   distributes requests evenly over 1 hour.
 pub fn start_sync(state: AppState) {
     tracing::info!("[sync] starting background sync");
-    start_syosetu_sync(state.clone(), ModuleType::Narou, Duration::from_secs(600));
-    start_syosetu_sync(
-        state.clone(),
-        ModuleType::Nocturne,
-        Duration::from_secs(600),
-    );
+    start_syosetu_sync(state.clone(), ModuleType::Narou, Duration::from_mins(10));
+    start_syosetu_sync(state.clone(), ModuleType::Nocturne, Duration::from_mins(10));
     start_kakuyomu_sync(state);
 }
 
 fn get_ids(db: &Arc<Mutex<Connection>>, type_str: &str) -> Vec<String> {
-    let conn = db.lock().unwrap();
+    let conn = db.lock().expect("lock holders never panic");
     let mut stmt =
         match conn.prepare("SELECT DISTINCT id FROM favorites WHERE type = ?1 ORDER BY id") {
             Ok(s) => s,
@@ -59,7 +55,7 @@ fn get_ids(db: &Arc<Mutex<Connection>>, type_str: &str) -> Vec<String> {
             }
         };
     let result = match stmt.query_map(rusqlite::params![type_str], |row| row.get::<_, String>(0)) {
-        Ok(rows) => rows.filter_map(|r| r.ok()).collect(),
+        Ok(rows) => rows.filter_map(std::result::Result::ok).collect(),
         Err(e) => {
             tracing::error!("[sync] {} query error: {}", type_str, e);
             Vec::new()
@@ -75,7 +71,9 @@ fn get_ids(db: &Arc<Mutex<Connection>>, type_str: &str) -> Vec<String> {
 fn refresh_favorite(conn: &Connection, type_str: &str, datum: &Value) -> usize {
     let id = datum["id"].as_str().unwrap_or_default();
     let title = datum["title"].as_str();
-    let new_page = datum["pages"].as_array().map(|a| a.len() as i64);
+    let new_page = datum["pages"]
+        .as_array()
+        .and_then(|a| i64::try_from(a.len()).ok());
     let novelupdated_at = datum["novelupdated_at"]
         .as_str()
         .and_then(crate::time::parse_upstream_timestamp);
@@ -93,7 +91,7 @@ fn refresh_favorite(conn: &Connection, type_str: &str, datum: &Value) -> usize {
 /// Refresh a single favorite from a fetched datum (kakuyomu periodic sync and the
 /// initial fetch on registration). See [`REFRESH_FAVORITE_SQL`] for the semantics.
 pub fn update_favorite_from_datum(db: &Arc<Mutex<Connection>>, type_str: &str, datum: &Value) {
-    let conn = db.lock().unwrap();
+    let conn = db.lock().expect("lock holders never panic");
     refresh_favorite(&conn, type_str, datum);
 }
 
@@ -122,7 +120,7 @@ async fn sync_syosetu(state: &AppState, module: &ModuleType, type_str: &str) {
         Ok(data) => {
             let mut changed = 0usize;
             {
-                let conn = state.db.lock().unwrap();
+                let conn = state.db.lock().expect("lock holders never panic");
                 let tx = match conn.unchecked_transaction() {
                     Ok(tx) => tx,
                     Err(e) => {
@@ -152,7 +150,13 @@ fn kakuyomu_cycle(ids: Vec<String>) -> impl Iterator<Item = (usize, String, Dura
     let count = ids.len();
     ids.into_iter().enumerate().map(move |(index, id)| {
         let offset_ms = KAKUYOMU_CYCLE.as_millis() * index as u128 / count as u128;
-        (index, id, Duration::from_millis(offset_ms as u64))
+        (
+            index,
+            id,
+            Duration::from_millis(
+                u64::try_from(offset_ms).expect("offset is below KAKUYOMU_CYCLE"),
+            ),
+        )
     })
 }
 
@@ -165,7 +169,7 @@ fn start_kakuyomu_sync(state: AppState) {
             let ids = get_ids(&state.db, type_str);
             let count = ids.len();
             if count == 0 {
-                tokio::time::sleep(Duration::from_secs(60)).await;
+                tokio::time::sleep(Duration::from_mins(1)).await;
                 continue;
             }
 
@@ -201,7 +205,7 @@ mod tests {
     use serde_json::json;
 
     fn db_with_favorite(
-        novelupdated_at: Option<rusqlite::types::Value>,
+        novelupdated_at: Option<&rusqlite::types::Value>,
         page: i64,
         title: &str,
     ) -> Arc<Mutex<Connection>> {
@@ -231,7 +235,7 @@ mod tests {
             .unwrap()
     }
 
-    /// A fetched datum with general_lastup already normalized to `novelupdated_at`.
+    /// A fetched datum with `general_lastup` already normalized to `novelupdated_at`.
     fn datum(title: &str, page_count: usize, novelupdated_at: Option<&str>) -> Value {
         let mut d = json!({ "id": "n1234ab", "title": title, "pages": pages(page_count) });
         if let Some(t) = novelupdated_at {
@@ -261,7 +265,7 @@ mod tests {
         // A row previously stamped with a (now-removed) crawl time is corrected to
         // the real publication time on the next sync.
         let db = db_with_favorite(
-            Some(rusqlite::types::Value::Integer(1_769_000_000)),
+            Some(&rusqlite::types::Value::Integer(1_769_000_000)),
             3,
             "Novel",
         );
@@ -278,7 +282,7 @@ mod tests {
         // kakuyomu omits the timestamp when lastEpisodePublishedAt is missing;
         // COALESCE must not clobber an existing value with NULL.
         let db = db_with_favorite(
-            Some(rusqlite::types::Value::Integer(1_704_067_200)),
+            Some(&rusqlite::types::Value::Integer(1_704_067_200)),
             3,
             "Novel",
         );
@@ -291,7 +295,7 @@ mod tests {
         // A title change triggers the UPDATE, but a datum without novelupdated_at
         // must leave the stored timestamp untouched (independent COALESCE columns).
         let db = db_with_favorite(
-            Some(rusqlite::types::Value::Integer(1_704_067_200)),
+            Some(&rusqlite::types::Value::Integer(1_704_067_200)),
             3,
             "Old Title",
         );
@@ -304,7 +308,7 @@ mod tests {
     #[test]
     fn periodic_refresh_replaces_non_integer_legacy_timestamp() {
         let db = db_with_favorite(
-            Some(rusqlite::types::Value::Text(
+            Some(&rusqlite::types::Value::Text(
                 "2026-05-20 09:55:00".to_string(),
             )),
             3,

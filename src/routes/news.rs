@@ -29,7 +29,10 @@ async fn get_news(
     Extension(user_id): Extension<UserId>,
     headers: HeaderMap,
 ) -> Result<impl IntoResponse, AppError> {
-    let items = load_favorite_updates(&state.db.lock().unwrap(), user_id.0)?;
+    let items = load_favorite_updates(
+        &state.db.lock().expect("lock holders never panic"),
+        user_id.0,
+    )?;
 
     let base = resolve_base_url(&headers, &state.config);
     let feed = build_json_feed(&items, &base);
@@ -124,7 +127,7 @@ mod tests {
         page: i64,
         read: i64,
     ) {
-        let db = state.db.lock().unwrap();
+        let db = state.db.lock().expect("lock holders never panic");
         db.execute(
             "INSERT OR IGNORE INTO users (id, email) VALUES (?1, 'u' || ?1)",
             [user_id],

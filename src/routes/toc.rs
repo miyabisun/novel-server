@@ -32,7 +32,7 @@ async fn get_toc(
     Path((type_str, id)): Path<(String, String)>,
 ) -> Result<Json<Value>, AppError> {
     let module = ModuleType::resolve(&type_str)?;
-    let label = format!("fetchToc {}/{}", type_str, id);
+    let label = format!("fetchToc {type_str}/{id}");
     let toc = super::with_retry(&label, || module.fetch_toc(&state.http, &id)).await?;
     Ok(Json(toc))
 }

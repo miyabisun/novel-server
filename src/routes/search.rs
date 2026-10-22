@@ -46,10 +46,10 @@ async fn get_search(
     let q = query
         .q
         .as_deref()
-        .map(|s| s.trim())
+        .map(str::trim)
         .filter(|s| !s.is_empty())
         .ok_or_else(|| AppError::BadRequest("Missing query parameter: q".into()))?;
-    let key = format!("novel:{}:search:{}", type_str, q);
+    let key = format!("novel:{type_str}:search:{q}");
 
     if let Some(cached) = state.cache.get(&key) {
         return Ok(Json(cached));

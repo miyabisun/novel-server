@@ -23,7 +23,7 @@ impl ModuleType {
         }
     }
 
-    pub fn as_str(&self) -> &'static str {
+    pub fn as_str(self) -> &'static str {
         match self {
             Self::Narou => "narou",
             Self::Nocturne => "nocturne",
@@ -34,7 +34,7 @@ impl ModuleType {
     /// Whether this site publishes a ranking for the given period. kakuyomu has
     /// no quarterly ranking; narou/nocturne support every period. Single source
     /// of truth so route validation and the fetch path can't drift apart.
-    pub fn supports_period(&self, period: &str) -> bool {
+    pub fn supports_period(self, period: &str) -> bool {
         !(matches!(self, Self::Kakuyomu) && period == "quarter")
     }
 

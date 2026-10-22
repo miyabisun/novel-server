@@ -82,7 +82,7 @@ async fn fetch_ranking(
     let period = period.unwrap_or("daily");
     validate_period(module, type_str, period)?;
 
-    let key = format!("novel:{}:ranking:{}", type_str, period);
+    let key = format!("novel:{type_str}:ranking:{period}");
 
     if use_cache {
         if let Some(cached) = state.cache.get(&key) {
@@ -103,8 +103,7 @@ fn validate_period(module: ModuleType, type_str: &str, period: &str) -> Result<(
     }
     if !module.supports_period(period) {
         return Err(AppError::BadRequest(format!(
-            "{} does not support {} ranking",
-            type_str, period
+            "{type_str} does not support {period} ranking"
         )));
     }
     Ok(())
