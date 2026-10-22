@@ -43,6 +43,8 @@ bin/dev
 
 ## コマンド一覧
 
+commit 前に `cargo fmt --check`・`cargo clippy`・`cargo test` を手元で通します。GitHub Actions は tag の release ビルドだけを行います。
+
 | コマンド | 説明 |
 |---------|------|
 | `cd client && npm install && npm run build` | フロントエンドセットアップ + ビルド |
@@ -52,6 +54,8 @@ bin/dev
 | `cargo run --release` | 本番サーバー起動 |
 | `cargo build --release` | リリースビルド |
 | `cargo test` | テスト実行 |
+| `cargo fmt --check` | Rust フォーマット検査 |
+| `cargo clippy --all-targets --all-features -- -D warnings` | Rust lint |
 
 ## 環境変数
 
