@@ -1,6 +1,52 @@
 import { test, expect } from '@playwright/test'
 import { mockApi } from './mock-api.js'
 
+// Page surfaces (--c-bg in global.sass): Kinari = light, Washi = e-paper, Sumi = dark.
+const SURFACE = {
+  kinari: 'rgb(250, 246, 239)',
+  washi: 'rgb(250, 250, 250)',
+  sumi: 'rgb(25, 25, 25)',
+}
+
+// The theme-color Chrome applies: the first meta[name=theme-color] in tree order
+// whose media matches (HTML spec; Blink Document::ThemeColor).
+function appliedThemeColor(page) {
+  return page.evaluate(
+    () =>
+      [...document.querySelectorAll('meta[name="theme-color"]')].find(
+        (meta) => !meta.media || matchMedia(meta.media).matches,
+      )?.content,
+  )
+}
+
+// Normalise a CSS colour to the computed rgb() form SURFACE uses.
+function rgb(page, color) {
+  return page.evaluate((value) => {
+    const probe = document.createElement('i')
+    probe.style.color = value
+    document.body.append(probe)
+    const computed = getComputedStyle(probe).color
+    probe.remove()
+    return computed
+  }, color)
+}
+
+// In a browser tab theme-color carries the page background of the active theme.
+async function expectTabThemeColor(page, surface) {
+  await expect.poll(() => appliedThemeColor(page)).toBe(surface)
+  expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe(surface)
+}
+
+// Android Chrome 153-155 draws an installed app's system buttons over the window
+// background, fixed at install from the manifest background_color (#F8F9FA without
+// one), and picks their contrast from theme-color. The standalone theme-color must come
+// first, so it wins there, and carry the Sumi backdrop the manifest declares.
+async function expectInstalledAppThemeColor(page) {
+  const first = page.locator('meta[name="theme-color"]').first()
+  await expect(first).toHaveAttribute('media', '(display-mode: standalone)')
+  expect(await rgb(page, await first.getAttribute('content'))).toBe(SURFACE.sumi)
+}
+
 test.describe('400px chrome', () => {
   test.beforeEach(async ({ page }) => {
     await mockApi(page)
@@ -160,5 +206,57 @@ test.describe('400px chrome', () => {
     await expect(items.nth(0)).toHaveText('テーマ設定')
     await expect(menu.getByRole('button', { name: '目次' })).toBeVisible()
     await expect(menu.getByRole('button', { name: 'お気に入りから削除' })).toBeVisible()
+  })
+
+  test('theme-color follows every theme choice in a tab and stays Sumi in an installed app', async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme: 'light' })
+    await page.goto('/')
+    await expectTabThemeColor(page, SURFACE.kinari)
+    await expectInstalledAppThemeColor(page)
+
+    // 自動 follows the OS while the page stays open.
+    await page.emulateMedia({ colorScheme: 'dark' })
+    await expectTabThemeColor(page, SURFACE.sumi)
+
+    await page.getByRole('button', { name: 'メニュー' }).click()
+    await page.getByRole('navigation', { name: 'アプリメニュー' }).getByText('テーマ設定').click()
+    for (const [label, surface] of [
+      ['ライト', SURFACE.kinari],
+      ['電子ペーパー', SURFACE.washi],
+      ['ダーク', SURFACE.sumi],
+    ]) {
+      await page.getByRole('radio', { name: label }).click()
+      await expectTabThemeColor(page, surface)
+      await expectInstalledAppThemeColor(page)
+    }
+
+    // A fixed choice ignores the OS switch; 自動 picks the OS back up.
+    await page.emulateMedia({ colorScheme: 'light' })
+    await expectTabThemeColor(page, SURFACE.sumi)
+    await page.getByRole('radio', { name: '自動' }).click()
+    await expectTabThemeColor(page, SURFACE.kinari)
+
+    await page.getByRole('radio', { name: '電子ペーパー' }).click()
+    await page.reload()
+    await expectTabThemeColor(page, SURFACE.washi)
+    await expectInstalledAppThemeColor(page)
+  })
+
+  test('installed app manifest declares the Sumi backdrop', async ({ page }) => {
+    await page.goto('/')
+    // The site sits behind Cloudflare Access; a manifest fetch omits cookies by default.
+    await expect(page.locator('link[rel="manifest"]')).toHaveAttribute(
+      'crossorigin',
+      'use-credentials',
+    )
+    const cdp = await page.context().newCDPSession(page)
+    const { errors, data } = await cdp.send('Page.getAppManifest')
+    expect(errors).toEqual([])
+    const manifest = JSON.parse(data)
+    expect(manifest.display).toBe('standalone')
+    expect(await rgb(page, manifest.background_color)).toBe(SURFACE.sumi)
+    expect(await rgb(page, manifest.theme_color)).toBe(SURFACE.sumi)
   })
 })

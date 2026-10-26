@@ -123,6 +123,10 @@ pub fn build_router(state: AppState) -> Router {
             "/favicon.svg",
             tower_http::services::ServeFile::new("client/build/favicon.svg"),
         )
+        .nest_service(
+            "/manifest.webmanifest",
+            tower_http::services::ServeFile::new("client/build/manifest.webmanifest"),
+        )
         .fallback(get(move || {
             let bp = base_path.clone();
             async move { spa_fallback(&bp) }

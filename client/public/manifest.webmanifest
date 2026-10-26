@@ -1,0 +1,10 @@
+{
+  "name": "novel-server",
+  "short_name": "novel",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#191919",
+  "theme_color": "#191919",
+  "icons": [{ "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}
