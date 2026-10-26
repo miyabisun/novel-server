@@ -124,6 +124,10 @@ pub fn build_router(state: AppState) -> Router {
             tower_http::services::ServeFile::new("client/build/favicon.svg"),
         )
         .nest_service(
+            "/icon-maskable.svg",
+            tower_http::services::ServeFile::new("client/build/icon-maskable.svg"),
+        )
+        .nest_service(
             "/manifest.webmanifest",
             tower_http::services::ServeFile::new("client/build/manifest.webmanifest"),
         )
