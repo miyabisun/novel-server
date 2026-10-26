@@ -40,7 +40,7 @@ Use ★ to add a favorite. Reading progress is saved when a reader page loads.
 The Docker example exposes only localhost. The native server listens on all interfaces.
 There is no built-in login: without an identity header, users share the guest account.
 For remote access, configure access control at your proxy or network boundary.
-When using the Cloudflare identity header, prevent direct access around that proxy.
+When using the Tailscale Serve identity header, prevent direct access that bypasses Serve.
 
 Mount the entire data directory, not just the SQLite file, to preserve WAL/SHM files.
 See [SQLite operations](docs/development.md#sqlite-運用) for backup and old-database restoration.
@@ -79,7 +79,7 @@ Sources: [configuration](src/config.rs), [startup](src/main.rs),
 - **Favorites** — Add from rankings with ★, auto-sync metadata (page count, update time)
 - **Reading Progress** — Automatically saved when a page loads in the reader
 - **Multi-user** — Favorites and reading progress are scoped per user.
-  Cloudflare Access supplies the identity via `Cf-Access-Authenticated-User-Email`.
+  [Tailscale Serve](https://tailscale.com/kb/1312/serve) supplies the identity via `Tailscale-User-Login`.
   Without the header, everyone uses the guest account.
 
 ## Documentation

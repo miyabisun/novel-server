@@ -83,7 +83,7 @@ Danger uses the family danger role with no extra project meaning.
   `kakuyomu` / `nocturne`. Compact (≤799px): root shortens to `novel`
   (brand dual while the title is hidden); site tabs to `nar` / `kak` /
   `noc`. Right: hamburger (36px). Menu order: optional auth email
-  (read-only, Cloudflare Access), **テーマ設定** first action, then
+  (read-only, Tailscale Serve), **テーマ設定** first action, then
   compact-viewport reader actions (目次 / お気に入りから削除).
 - **Ranking control band:** sticky under header; same grey recipe as
   Reader (`.reader-bar`: `--c-surface`, hairline, `--subheader-h` 40px).

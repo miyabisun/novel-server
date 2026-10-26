@@ -276,11 +276,6 @@ test.describe('400px chrome', () => {
 
   test('installed app manifest declares the Sumi backdrop', async ({ page }) => {
     await page.goto('/')
-    // The site sits behind Cloudflare Access; a manifest fetch omits cookies by default.
-    await expect(page.locator('link[rel="manifest"]')).toHaveAttribute(
-      'crossorigin',
-      'use-credentials',
-    )
     const cdp = await page.context().newCDPSession(page)
     const { errors, data } = await cdp.send('Page.getAppManifest')
     expect(errors).toEqual([])

@@ -125,9 +125,10 @@ location /novels {
 }
 ```
 
-## マルチユーザー (Cloudflare Access)
+## マルチユーザー (Tailscale Serve)
 
-Cloudflare Accessは`Cf-Access-Authenticated-User-Email`ヘッダーで利用者を識別します。
+Tailscale Serveは、tailnetの利用者の端末からの要求に`Tailscale-User-Login`ヘッダー (ログイン名) を付けて利用者を識別します。
+クライアントが送った同名のヘッダーはServeが取り除きます。Serveを経ずにアプリへ届く経路を作らないでください。
 このメールアドレスごとに、お気に入り・既読位置・RSSフィードを分離します。
 
 - ヘッダーなしの場合はゲストユーザーとして動作
