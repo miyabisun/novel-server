@@ -10,6 +10,7 @@
 - [Rust](https://rustup.rs/) (stable)
 - [Node.js](https://nodejs.org/) 20.19以上または22.12以上とnpm (フロントエンドビルド用)
 - Git、OpenSSL・SQLite向けのビルドツール（Debian/Ubuntuなら `build-essential pkg-config libssl-dev`）
+- Python 3 (画面の試験のbrowserを取る `bin/browser` 用)
 
 ## セットアップ
 
@@ -43,17 +44,27 @@ bin/dev
 
 ## コマンド一覧
 
-commit 前に `cargo fmt --check`・`cargo clippy`・`cargo test` を手元で通します。GitHub Actions は tag の release ビルドだけを行います。
+commit 前に、次の順で手元で通します。GitHub Actions は tag の release ビルドだけを行います。
+
+1. `cd client && npm test && npm run build && cd ..`: 画面の試験 (jsdom) と、`cargo test` の画面の試験が開くbuild
+2. `cargo fmt --check`・`cargo clippy --all-targets --all-features -- -D warnings`
+3. `cargo test`: Rustの試験と、実binaryの画面を実際のbrowserで測る試験 (`tests/page.rs`)
+
+画面の試験は2層です。配置・大きさ・実際の色・manifestとiconのように、browserのengineでしか確かめられない物だけを `tests/page.rs` に書き、ほかは `client/src/*.test.ts` (vitest + jsdom) に書きます。
+`tests/page.rs` は、Chrome for Testingの`chrome-headless-shell`と同じ版の`chromedriver`を`bin/browser`で `${XDG_CACHE_HOME:-~/.cache}/chrome-for-testing/<版>/` へ取り (初回だけnetworkへ出ます)、W3C WebDriverで操縦します。
+browserは1つで、試験は書いた順に1本ずつ流れます。serverとchromedriverはOSが選んだ空きportで起こし、DBは一時directoryに置きます。APIの応答はpageの中の偽物 (`tests/support/api.js`) が返し、小説サイトへは届きません。
+`bin/browser` の試験は `python3 bin/test_browser.py` です。
 
 | コマンド | 説明 |
 |---------|------|
 | `cd client && npm install && npm run build` | フロントエンドセットアップ + ビルド |
 | `cd client && npm run fmt` | フロントエンドコードフォーマット (oxfmt) |
 | `cd client && npm run lint` | フロントエンド lint (oxlint) |
+| `cd client && npm test` | 画面の試験 (vitest + jsdom) |
 | `cargo run` | 開発サーバー起動 |
 | `cargo run --release` | 本番サーバー起動 |
 | `cargo build --release` | リリースビルド |
-| `cargo test` | テスト実行 |
+| `cargo test` | テスト実行 (`client/build` の画面を実際のbrowserで測る `tests/page.rs` を含む) |
 | `cargo fmt --check` | Rust フォーマット検査 |
 | `cargo clippy --all-targets --all-features -- -D warnings` | Rust lint |
 

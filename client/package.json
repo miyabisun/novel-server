@@ -7,15 +7,15 @@
     "dev": "vp dev --port 5173 --host",
     "build": "vp build",
     "preview": "vp preview --port 5173 --host",
-    "test": "vp test",
-    "test:e2e": "playwright test",
+    "test": "vitest run",
     "fmt": "vp fmt",
     "lint": "vp lint",
     "check": "vp check"
   },
   "devDependencies": {
-    "@playwright/test": "^1.61.1",
     "@sveltejs/vite-plugin-svelte": "^7.0.0",
+    "@testing-library/svelte": "5.4.2",
+    "jsdom": "29.1.1",
     "normalize.css": "^8.0.1",
     "oxfmt": "^0.41.0",
     "oxlint": "^1.56.0",
@@ -23,6 +23,6 @@
     "svelte": "^5.46.4",
     "vite": "^8.0.0",
     "vite-plus": "^0.1.12",
-    "vitest": "^4.1.0"
+    "vitest": "4.1.10"
   }
 }

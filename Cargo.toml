@@ -26,6 +26,14 @@ utoipa-swagger-ui = { version = "9", features = ["axum"] }
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }
+tempfile = "3"
+
+# The page in a real browser: its own runner runs the tests one after another. The path is
+# named so that the image build, which copies src/ without tests/, still reads the manifest.
+[[test]]
+name = "page"
+path = "tests/page.rs"
+harness = false
 
 [lints.clippy]
 pedantic = { level = "warn", priority = -1 }
